@@ -35,7 +35,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode, urlsplit
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -63,6 +63,11 @@ IZVORI = ["Privatno", "Booking"]
 RADNI_DAN_POCINJE_U = 6
 
 NOVAC = ["pazar_kafana", "rashod_kafana", "pazar_kuhinja", "rashod_kuhinja", "pazar_smjestaj"]
+
+# Ikonica aplikacije: fajl ikona.png stoji u GitHub repozitorijumu pored app.py.
+# IKONA_URL je javna adresa tog fajla (ako se repozitorijum preimenuje, promijeni i ovo).
+IKONA_URL = "https://raw.githubusercontent.com/raic1802/restoran-app/main/ikona.png"
+IKONA_FAJL = Path(__file__).with_name("ikona.png")
 
 DANI = ["Ponedjeljak", "Utorak", "Srijeda", "Četvrtak", "Petak", "Subota", "Nedjelja"]
 DANI_KRATKO = ["Pon", "Uto", "Sri", "Čet", "Pet", "Sub", "Ned"]
@@ -582,6 +587,28 @@ def zapamti_uredjaj() -> None:
         st.query_params.from_dict(parametri)
 
 
+def adresa_aplikacije() -> str:
+    """Osnovna adresa aplikacije, npr. https://restoran-app.streamlit.app/"""
+    try:
+        dijelovi = urlsplit(st.context.url or "")
+        if dijelovi.scheme and dijelovi.netloc:
+            return f"{dijelovi.scheme}://{dijelovi.netloc}/"
+    except Exception:
+        pass
+    try:
+        host = st.context.headers.get("host", "")
+    except Exception:
+        host = ""
+    return f"https://{host}/" if host else ""
+
+
+def link_za_uredjaj() -> str:
+    adresa, parametri = adresa_aplikacije(), parametri_uredjaja()
+    if not adresa or not parametri:
+        return ""
+    return adresa + "?" + urlencode(parametri, quote_via=quote)
+
+
 def automatska_prijava() -> None:
     if korisnik():
         return
@@ -672,7 +699,7 @@ def linkovi_za_poruku(poruka: str, telefon: str) -> dict[str, str]:
 # ═════════════════════════════════════════════════════════════════════════════
 
 CSS = """<style>
-.block-container, [data-testid="stMainBlockContainer"] {max-width: 1080px; padding-top: 1.25rem; padding-bottom: 5rem;}
+.block-container, [data-testid="stMainBlockContainer"] {max-width: 1080px; padding-bottom: 5rem;}
 [data-testid="stButton"] button, [data-testid="stFormSubmitButton"] button, [data-testid="stLinkButton"] a, [data-testid="stDownloadButton"] button {min-height: 3rem; border-radius: 12px; font-weight: 600;}
 [data-testid="stCheckbox"] {padding: .55rem .25rem; border-bottom: 1px solid rgba(128,128,128,.18);}
 [data-testid="stCheckbox"] label {width: 100%; font-size: 1.05rem;}
@@ -703,6 +730,45 @@ table.kal tr.danas td {outline: 2px solid rgba(128,128,128,.55); outline-offset:
 
 def ubaci_stil() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
+
+
+def ubaci_ikonicu() -> None:
+    """Postavlja logo kao ikonicu na početnom ekranu telefona i naziv ispod nje."""
+    if not IKONA_URL:
+        return
+    naziv = procitaj_podesavanje("naziv_objekta", "Restoran")
+    skripta = """<script>
+(function () {
+  var ikona = __IKONA__, naziv = __NAZIV__;
+  function meta(d, ime, sadrzaj) {
+    var m = d.querySelector('meta[name="' + ime + '"]');
+    if (!m) { m = d.createElement('meta'); m.setAttribute('name', ime); d.head.appendChild(m); }
+    m.setAttribute('content', sadrzaj);
+  }
+  function link(d, rel, velicina) {
+    var l = d.createElement('link');
+    l.setAttribute('rel', rel); l.setAttribute('href', ikona); l.setAttribute('data-ikona', '1');
+    if (velicina) { l.setAttribute('sizes', velicina); l.setAttribute('type', 'image/png'); }
+    d.head.appendChild(l);
+  }
+  function postavi(d) {
+    if (!d || !d.head) return;
+    d.querySelectorAll('link[rel="apple-touch-icon"], link[rel="apple-touch-icon-precomposed"], link[data-ikona]')
+      .forEach(function (e) { e.remove(); });
+    link(d, 'apple-touch-icon', '');
+    link(d, 'icon', '512x512');
+    meta(d, 'apple-mobile-web-app-title', naziv);
+    meta(d, 'application-name', naziv);
+    meta(d, 'apple-mobile-web-app-capable', 'yes');
+    meta(d, 'mobile-web-app-capable', 'yes');
+  }
+  postavi(document);
+  try { if (window.top && window.top !== window) { postavi(window.top.document); } } catch (e) {}
+})();
+</script>"""
+    skripta = skripta.replace("__IKONA__", json.dumps(IKONA_URL).replace("</", "<\\/"))
+    skripta = skripta.replace("__NAZIV__", json.dumps(naziv).replace("</", "<\\/"))
+    st.html(skripta, unsafe_allow_javascript=True)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -811,17 +877,25 @@ def stranica_pocetna() -> None:
         if st.button("Nova rezervacija", icon=":material/hotel:", width="stretch", key="brzo_rezervacija"):
             st.switch_page(STRANICE["smjestaj"])
 
-    with st.expander("Aplikacija na telefonu (ikonica na početnom ekranu)"):
+    with st.expander("Zapamti prijavu na ovom telefonu", icon=":material/smartphone:"):
+        link = link_za_uredjaj()
         st.markdown(
-            "Dok si na ovoj stranici, dodaj je na početni ekran telefona. "
-            "Ikonica će otvarati aplikaciju odmah prijavljenu, bez kucanja.\n\n"
+            "**1.** Pritisni dugme ispod. Otvoriće se nova stranica sa tvojom prijavom u adresi."
+        )
+        if link:
+            st.link_button("Otvori link za ovaj telefon", link, type="primary", width="stretch")
+        else:
+            st.caption("Link trenutno nije dostupan – osvježi stranicu i pokušaj ponovo.")
+        st.markdown(
+            "**2.** Na toj novoj stranici dodaj ikonicu na početni ekran:\n"
             "- **iPhone (Safari):** dugme za dijeljenje (kvadrat sa strelicom) → "
             "**Add to Home Screen / Dodaj na početni ekran** → **Add / Dodaj**\n"
-            "- **Android (Chrome):** meni **⋮** gore desno → **Add to Home screen / "
-            "Dodaj na početni ekran** → ako pita, izaberi **Create shortcut / Napravi prečicu**\n\n"
-            "Ikonica u sebi nosi tvoju prijavu, zato link sa nje ne šalji drugima. "
-            "Ako telefon promijeni vlasnika, obriši ikonicu (a za admina promijeni "
-            "i ADMIN_LOZINKA u Secrets, što poništava sve zapamćene telefone)."
+            "- **Android (Chrome):** meni **⋮** → **Add to Home screen / Dodaj na početni ekran** → "
+            "ako pita, izaberi **Create shortcut / Napravi prečicu**\n\n"
+            "**3.** Staru ikonicu, ako je imaš, obriši. Nova se otvara odmah prijavljena.\n\n"
+            "Ikonica u sebi nosi tvoju prijavu, zato taj link ne šalji drugima. Ako telefon "
+            "promijeni vlasnika, obriši ikonicu (a za admina promijeni i ADMIN_LOZINKA u "
+            "Secrets, što poništava sve zapamćene telefone)."
         )
 
 
@@ -1674,7 +1748,7 @@ STRANICE: dict = {}
 def main() -> None:
     st.set_page_config(
         page_title=procitaj_podesavanje("naziv_objekta", "Restoran"),
-        page_icon="🍽️",
+        page_icon=str(IKONA_FAJL) if IKONA_FAJL.exists() else "🍽️",
         layout="wide",
         initial_sidebar_state="collapsed",
     )
@@ -1686,6 +1760,7 @@ def main() -> None:
         st.navigation(
             [st.Page(stranica_prijava, title="Prijava", icon=":material/login:")], position="hidden"
         ).run()
+        ubaci_ikonicu()
         return
 
     zaglavlje()
@@ -1729,6 +1804,7 @@ def main() -> None:
         meni = rad
 
     st.navigation(meni, position="top").run()
+    ubaci_ikonicu()
 
 
 if __name__ == "__main__":
