@@ -86,6 +86,12 @@ def tajna(kljuc: str, podrazumijevano: str = "") -> str:
 
 
 def _postoje_secrets() -> bool:
+    ucitaj = getattr(type(st.secrets), "load_if_toml_exists", None)
+    if callable(ucitaj):
+        try:
+            return bool(ucitaj(st.secrets))
+        except Exception:
+            pass
     try:
         from streamlit import config as st_config
 
@@ -179,15 +185,38 @@ def _migriraj(engine) -> None:
             conn.execute(text("INSERT INTO verzija_seme (verzija) VALUES (:v)"), {"v": broj_verzije})
 
 
+def _postgres_drajver() -> str:
+    """Bira instalirani PostgreSQL drajver (psycopg2 ili psycopg 3)."""
+    try:
+        import psycopg2  # noqa: F401
+
+        return "psycopg2"
+    except ImportError:
+        return "psycopg"
+
+
+def pripremi_url(url: str) -> tuple[str, dict]:
+    """Vraća (adresa baze sa izričitim drajverom, dodatni parametri konekcije)."""
+    url = url.strip()
+    if url.startswith("sqlite"):
+        return url, {"check_same_thread": False}
+    for prefiks in ("postgres://", "postgresql://"):
+        if url.startswith(prefiks):
+            url = f"postgresql+{_postgres_drajver()}://" + url[len(prefiks):]
+            break
+    if url.startswith("postgresql+psycopg://"):
+        # bez pripremljenih upita – sigurno i preko pooler konekcije (Neon, Supabase)
+        return url, {"prepare_threshold": None}
+    return url, {}
+
+
 @st.cache_resource(show_spinner=False)
 def baza():
-    url = tajna("DATABASE_URL", "sqlite:///restoran.db")
-    if url.startswith("postgres://"):
-        url = "postgresql://" + url[len("postgres://"):]
+    url, parametri = pripremi_url(tajna("DATABASE_URL", "sqlite:///restoran.db"))
     if url.startswith("sqlite"):
-        engine = create_engine(url, connect_args={"check_same_thread": False})
+        engine = create_engine(url, connect_args=parametri)
     else:
-        engine = create_engine(url, pool_pre_ping=True, pool_recycle=300)
+        engine = create_engine(url, connect_args=parametri, pool_pre_ping=True, pool_recycle=300)
     _migriraj(engine)
     return engine
 
