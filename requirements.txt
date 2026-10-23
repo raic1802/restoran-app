@@ -1,0 +1,5 @@
+streamlit>=1.66
+sqlalchemy>=2.0
+pandas>=2.2
+psycopg2-binary>=2.9
+tzdata
