@@ -35,7 +35,7 @@ import os
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from urllib.parse import quote, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlencode
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -547,13 +547,16 @@ def samo_admin() -> None:
 def _odjava() -> None:
     st.session_state.clear()
     st.query_params.clear()
+    st.session_state["_odjava"] = True  # ne prijavljuj ponovo iz zapamćenog kolačića
 
 
-# ── Zapamćen uređaj ──────────────────────────────────────────────────────────
-# Poslije prijave, adresa početne stranice dobija ključ (?k=… za admina,
-# ?ime=… za zaposlene). Ikonica na početnom ekranu telefona čuva tu adresu,
-# pa se aplikacija otvara odmah prijavljena. Promjena ADMIN_LOZINKA poništava
-# sve zapamćene admin uređaje.
+# ── Zapamćena prijava na uređaju ─────────────────────────────────────────────
+# Poslije prijave, telefon/računar čuva ključ prijave (kolačić + memorija
+# pregledača), pa ostaje prijavljen i kad se aplikacija zatvori, sve dok se
+# ne pritisne „Odjava". Ključ je potpisan lozinkom: promjena ADMIN_LOZINKA
+# (ili KOD_OBJEKTA) poništava sve zapamćene prijave.
+
+KOLACIC = "vidikovac_prijava"
 
 def _potpis(tajni_kljuc: str, poruka: str) -> str:
     return hmac.new(tajni_kljuc.encode(), poruka.encode(), hashlib.sha256).hexdigest()[:24]
@@ -587,46 +590,52 @@ def zapamti_uredjaj() -> None:
         st.query_params.from_dict(parametri)
 
 
-def adresa_aplikacije() -> str:
-    """Osnovna adresa aplikacije, npr. https://restoran-app.streamlit.app/"""
-    try:
-        dijelovi = urlsplit(st.context.url or "")
-        if dijelovi.scheme and dijelovi.netloc:
-            return f"{dijelovi.scheme}://{dijelovi.netloc}/"
-    except Exception:
-        pass
-    try:
-        host = st.context.headers.get("host", "")
-    except Exception:
-        host = ""
-    return f"https://{host}/" if host else ""
+def prijava_za_pamcenje() -> str:
+    """Ključ prijave u obliku 'k=…' ili 'ime=…&kod=…' (prazno ako niko nije prijavljen)."""
+    parametri = parametri_uredjaja()
+    return urlencode(parametri, quote_via=quote) if parametri else ""
 
 
-def link_za_uredjaj() -> str:
-    adresa, parametri = adresa_aplikacije(), parametri_uredjaja()
-    if not adresa or not parametri:
-        return ""
-    return adresa + "?" + urlencode(parametri, quote_via=quote)
+def _korisnik_iz_parametara(p: dict) -> dict | None:
+    k = str(p.get("k") or "")
+    ime = ocisti(p.get("ime"))
+    kod = str(p.get("kod") or "")
+    if k:
+        ocekivani = admin_kljuc()
+        if ocekivani and hmac.compare_digest(k.encode(), ocekivani.encode()):
+            return {"ime": "Admin", "uloga": "admin"}
+        return None
+    if ime_ok(ime):
+        ocekivani = radnik_kljuc()
+        if not ocekivani or hmac.compare_digest(kod.encode(), ocekivani.encode()):
+            return {"ime": ime, "uloga": "radnik"}
+    return None
+
+
+def _parametri_iz_kolacica() -> dict:
+    try:
+        vrijednost = st.context.cookies.get(KOLACIC) or ""
+    except Exception:
+        return {}
+    procitano = parse_qs(unquote(str(vrijednost)))
+    return {k: v[0] for k, v in procitano.items() if v}
 
 
 def automatska_prijava() -> None:
     if korisnik():
         return
+    izvori = []
     try:
-        k = st.query_params.get("k", "")
-        ime = ocisti(st.query_params.get("ime", ""))
-        kod = st.query_params.get("kod", "")
+        izvori.append({k: st.query_params.get(k, "") for k in ("k", "ime", "kod")})
     except Exception:
-        return
-    if k:
-        ocekivani = admin_kljuc()
-        if ocekivani and hmac.compare_digest(k.encode(), ocekivani.encode()):
-            st.session_state["korisnik"] = {"ime": "Admin", "uloga": "admin"}
-        return
-    if ime_ok(ime):
-        ocekivani = radnik_kljuc()
-        if not ocekivani or hmac.compare_digest(kod.encode(), ocekivani.encode()):
-            st.session_state["korisnik"] = {"ime": ime, "uloga": "radnik"}
+        pass
+    if not st.session_state.get("_odjava"):
+        izvori.append(_parametri_iz_kolacica())
+    for parametri in izvori:
+        nadjen = _korisnik_iz_parametara(parametri)
+        if nadjen:
+            st.session_state["korisnik"] = nadjen
+            return
 
 
 # ── Poruke i resetovanje formi poslije uspješnog unosa ───────────────────────
@@ -732,14 +741,47 @@ def ubaci_stil() -> None:
     st.markdown(CSS, unsafe_allow_html=True)
 
 
-def ubaci_ikonicu() -> None:
-    """Postavlja logo kao ikonicu na početnom ekranu telefona i naziv ispod nje."""
-    if not IKONA_URL:
-        return
+def ubaci_skriptu() -> None:
+    """Pamti prijavu na uređaju i postavlja logo kao ikonicu na početnom ekranu."""
     naziv = procitaj_podesavanje("naziv_objekta", "Restoran")
+    vrijednosti = {
+        "__IKONA__": IKONA_URL,
+        "__NAZIV__": naziv,
+        "__PRIJAVA__": prijava_za_pamcenje(),
+        "__ODJAVA__": bool(st.session_state.get("_odjava")),
+        "__KLJUC__": KOLACIC,
+    }
     skripta = """<script>
 (function () {
+  // ── pamćenje prijave ──
+  var KLJUC = __KLJUC__, prijava = __PRIJAVA__, odjava = __ODJAVA__, POKUSAJ = KLJUC + '_pokusaj';
+  function kolacic(v, trajanje) {
+    var sigurno = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = KLJUC + '=' + encodeURIComponent(v) + '; Max-Age=' + trajanje + '; Path=/; SameSite=Lax' + sigurno;
+  }
+  try {
+    if (prijava) {
+      localStorage.setItem(KLJUC, prijava);
+      sessionStorage.removeItem(POKUSAJ);
+      kolacic(prijava, 34560000);
+    } else if (odjava) {
+      localStorage.removeItem(KLJUC);
+      kolacic('', 0);
+    } else {
+      var sacuvano = localStorage.getItem(KLJUC);
+      if (sacuvano && !sessionStorage.getItem(POKUSAJ)) {
+        sessionStorage.setItem(POKUSAJ, '1');
+        location.replace(location.pathname + '?' + sacuvano);
+      } else if (sacuvano) {
+        localStorage.removeItem(KLJUC);
+        kolacic('', 0);
+      }
+    }
+  } catch (e) {}
+
+  // ── ikonica na početnom ekranu ──
   var ikona = __IKONA__, naziv = __NAZIV__;
+  if (!ikona) return;
   function meta(d, ime, sadrzaj) {
     var m = d.querySelector('meta[name="' + ime + '"]');
     if (!m) { m = d.createElement('meta'); m.setAttribute('name', ime); d.head.appendChild(m); }
@@ -766,8 +808,8 @@ def ubaci_ikonicu() -> None:
   try { if (window.top && window.top !== window) { postavi(window.top.document); } } catch (e) {}
 })();
 </script>"""
-    skripta = skripta.replace("__IKONA__", json.dumps(IKONA_URL).replace("</", "<\\/"))
-    skripta = skripta.replace("__NAZIV__", json.dumps(naziv).replace("</", "<\\/"))
+    for oznaka, vrijednost in vrijednosti.items():
+        skripta = skripta.replace(oznaka, json.dumps(vrijednost).replace("</", "<\\/"))
     st.html(skripta, unsafe_allow_javascript=True)
 
 
@@ -797,6 +839,7 @@ def stranica_prijava() -> None:
                 st.error("Pogrešan kod objekta.")
             else:
                 st.session_state["korisnik"] = {"ime": ime, "uloga": "radnik"}
+                st.session_state.pop("_odjava", None)
                 st.rerun()
 
     with tab_admin:
@@ -809,6 +852,7 @@ def stranica_prijava() -> None:
         if prijava:
             if provjeri_admina(email, lozinka):
                 st.session_state["korisnik"] = {"ime": "Admin", "uloga": "admin", "email": email.strip()}
+                st.session_state.pop("_odjava", None)
                 st.rerun()
             else:
                 st.error("Pogrešan e-mail ili lozinka.")
@@ -877,25 +921,17 @@ def stranica_pocetna() -> None:
         if st.button("Nova rezervacija", icon=":material/hotel:", width="stretch", key="brzo_rezervacija"):
             st.switch_page(STRANICE["smjestaj"])
 
-    with st.expander("Zapamti prijavu na ovom telefonu", icon=":material/smartphone:"):
-        link = link_za_uredjaj()
+    with st.expander("Ikonica na telefonu", icon=":material/smartphone:"):
         st.markdown(
-            "**1.** Pritisni dugme ispod. Otvoriće se nova stranica sa tvojom prijavom u adresi."
-        )
-        if link:
-            st.link_button("Otvori link za ovaj telefon", link, type="primary", width="stretch")
-        else:
-            st.caption("Link trenutno nije dostupan – osvježi stranicu i pokušaj ponovo.")
-        st.markdown(
-            "**2.** Na toj novoj stranici dodaj ikonicu na početni ekran:\n"
+            "Ovaj telefon pamti prijavu dok ne pritisneš **Odjava**.\n\n"
+            "Da dodaš ikonicu na početni ekran:\n"
             "- **iPhone (Safari):** dugme za dijeljenje (kvadrat sa strelicom) → "
             "**Add to Home Screen / Dodaj na početni ekran** → **Add / Dodaj**\n"
             "- **Android (Chrome):** meni **⋮** → **Add to Home screen / Dodaj na početni ekran** → "
             "ako pita, izaberi **Create shortcut / Napravi prečicu**\n\n"
-            "**3.** Staru ikonicu, ako je imaš, obriši. Nova se otvara odmah prijavljena.\n\n"
-            "Ikonica u sebi nosi tvoju prijavu, zato taj link ne šalji drugima. Ako telefon "
-            "promijeni vlasnika, obriši ikonicu (a za admina promijeni i ADMIN_LOZINKA u "
-            "Secrets, što poništava sve zapamćene telefone)."
+            "Kad prvi put otvoriš ikonicu, prijavi se još jednom. Poslije toga ulaziš direktno.\n\n"
+            "Ako se telefon izgubi, promijeni ADMIN_LOZINKA u Secrets na Streamlitu. "
+            "Tako se poništavaju sve zapamćene prijave."
         )
 
 
@@ -1760,7 +1796,7 @@ def main() -> None:
         st.navigation(
             [st.Page(stranica_prijava, title="Prijava", icon=":material/login:")], position="hidden"
         ).run()
-        ubaci_ikonicu()
+        ubaci_skriptu()
         return
 
     zaglavlje()
@@ -1804,7 +1840,7 @@ def main() -> None:
         meni = rad
 
     st.navigation(meni, position="top").run()
-    ubaci_ikonicu()
+    ubaci_skriptu()
 
 
 if __name__ == "__main__":
