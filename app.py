@@ -27,6 +27,7 @@ Nova kolona ili tabela = nova stavka na kraju liste MIGRACIJE u dijelu 2.
 """
 from __future__ import annotations
 
+import hashlib
 import hmac
 import html
 import json
@@ -540,6 +541,65 @@ def samo_admin() -> None:
 
 def _odjava() -> None:
     st.session_state.clear()
+    st.query_params.clear()
+
+
+# ── Zapamćen uređaj ──────────────────────────────────────────────────────────
+# Poslije prijave, adresa početne stranice dobija ključ (?k=… za admina,
+# ?ime=… za zaposlene). Ikonica na početnom ekranu telefona čuva tu adresu,
+# pa se aplikacija otvara odmah prijavljena. Promjena ADMIN_LOZINKA poništava
+# sve zapamćene admin uređaje.
+
+def _potpis(tajni_kljuc: str, poruka: str) -> str:
+    return hmac.new(tajni_kljuc.encode(), poruka.encode(), hashlib.sha256).hexdigest()[:24]
+
+
+def admin_kljuc() -> str:
+    lozinka = tajna("ADMIN_LOZINKA")
+    return _potpis(lozinka, "admin:" + tajna("ADMIN_EMAIL").strip().lower()) if lozinka else ""
+
+
+def radnik_kljuc() -> str:
+    kod = tajna("KOD_OBJEKTA")
+    return _potpis(kod, "radnik") if kod else ""
+
+
+def parametri_uredjaja() -> dict[str, str]:
+    k = korisnik()
+    if not k:
+        return {}
+    if k.get("uloga") == "admin":
+        return {"k": admin_kljuc()}
+    parametri = {"ime": k["ime"]}
+    if radnik_kljuc():
+        parametri["kod"] = radnik_kljuc()
+    return parametri
+
+
+def zapamti_uredjaj() -> None:
+    parametri = parametri_uredjaja()
+    if parametri and st.query_params.to_dict() != parametri:
+        st.query_params.from_dict(parametri)
+
+
+def automatska_prijava() -> None:
+    if korisnik():
+        return
+    try:
+        k = st.query_params.get("k", "")
+        ime = ocisti(st.query_params.get("ime", ""))
+        kod = st.query_params.get("kod", "")
+    except Exception:
+        return
+    if k:
+        ocekivani = admin_kljuc()
+        if ocekivani and hmac.compare_digest(k.encode(), ocekivani.encode()):
+            st.session_state["korisnik"] = {"ime": "Admin", "uloga": "admin"}
+        return
+    if ime_ok(ime):
+        ocekivani = radnik_kljuc()
+        if not ocekivani or hmac.compare_digest(kod.encode(), ocekivani.encode()):
+            st.session_state["korisnik"] = {"ime": ime, "uloga": "radnik"}
 
 
 # ── Poruke i resetovanje formi poslije uspješnog unosa ───────────────────────
@@ -716,6 +776,7 @@ def kartice_soba(zauzete: dict[int, dict]) -> None:
 
 
 def stranica_pocetna() -> None:
+    zapamti_uredjaj()
     dan = danas()
     st.title(dugi_datum(dan))
     zauzete = {int(r["soba"]): r for r in rezervacije_u_periodu(dan, dan)}
@@ -749,6 +810,19 @@ def stranica_pocetna() -> None:
             st.switch_page(STRANICE["nabavka"])
         if st.button("Nova rezervacija", icon=":material/hotel:", width="stretch", key="brzo_rezervacija"):
             st.switch_page(STRANICE["smjestaj"])
+
+    with st.expander("Aplikacija na telefonu (ikonica na početnom ekranu)"):
+        st.markdown(
+            "Dok si na ovoj stranici, dodaj je na početni ekran telefona. "
+            "Ikonica će otvarati aplikaciju odmah prijavljenu, bez kucanja.\n\n"
+            "- **iPhone (Safari):** dugme za dijeljenje (kvadrat sa strelicom) → "
+            "**Add to Home Screen / Dodaj na početni ekran** → **Add / Dodaj**\n"
+            "- **Android (Chrome):** meni **⋮** gore desno → **Add to Home screen / "
+            "Dodaj na početni ekran** → ako pita, izaberi **Create shortcut / Napravi prečicu**\n\n"
+            "Ikonica u sebi nosi tvoju prijavu, zato link sa nje ne šalji drugima. "
+            "Ako telefon promijeni vlasnika, obriši ikonicu (a za admina promijeni "
+            "i ADMIN_LOZINKA u Secrets, što poništava sve zapamćene telefone)."
+        )
 
 
 # ── Kraj smjene: pazar i rashodi ─────────────────────────────────────────────
@@ -1606,6 +1680,7 @@ def main() -> None:
     )
     primijeni_reset()
     ubaci_stil()
+    automatska_prijava()
 
     if not korisnik():
         st.navigation(
