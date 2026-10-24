@@ -860,36 +860,46 @@ def linkovi_za_poruku(poruka: str, telefon: str) -> dict[str, str]:
 # ═════════════════════════════════════════════════════════════════════════════
 
 CSS = """<style>
-.block-container, [data-testid="stMainBlockContainer"] {max-width: 1080px; padding-bottom: 5rem;}
+.block-container, [data-testid="stMainBlockContainer"] {max-width: 1080px; padding-top: 4.25rem; padding-bottom: 4rem;}
+@media (max-width: 640px) {
+  .block-container, [data-testid="stMainBlockContainer"] {padding-left: .75rem; padding-right: .75rem;}
+}
 [data-testid="stButton"] button, [data-testid="stFormSubmitButton"] button, [data-testid="stLinkButton"] a, [data-testid="stDownloadButton"] button {min-height: 3rem; border-radius: 12px; font-weight: 600;}
 [data-testid="stCheckbox"] {padding: .55rem .25rem; border-bottom: 1px solid rgba(128,128,128,.18);}
 [data-testid="stCheckbox"] label {width: 100%; font-size: 1.05rem;}
 input, textarea {font-size: 16px !important;}
 h1 {font-size: 1.75rem !important;}
-[class*="st-key-kartica_zauzeta_"] {background: rgba(220,38,38,.08) !important; border-color: rgba(220,38,38,.45) !important; border-radius: 14px !important;}
-[class*="st-key-kartica_slobodna_"] {background: rgba(22,163,74,.08) !important; border-color: rgba(22,163,74,.45) !important; border-radius: 14px !important;}
-[class*="st-key-kartica_"] [data-testid="stButton"] button {min-height: 2.5rem;}
-[class*="st-key-kartica_"] {cursor: pointer; transition: transform .08s ease;}
+/* gornji red: ☰ Meni + datum */
+.st-key-zaglavlje {margin-bottom: .35rem;}
+.st-key-zaglavlje [data-testid="stButton"] button {min-height: 2.6rem; min-width: 2.6rem; padding: 0 .6rem;}
+.st-key-glavni_meni button {min-height: 2.6rem; font-weight: 700; border-radius: 12px;}
+.datum-naslov {font-size: 1.15rem; font-weight: 700; line-height: 1.25; text-align: center; margin: 0; white-space: nowrap;}
+.datum-naslov .nije-danas {display: block; font-size: .7rem; font-weight: 600; opacity: .6;}
+.korisnik {margin: 0 0 0 auto; font-size: .85rem; opacity: .65; white-space: nowrap;}
+/* brza dugmad */
+.st-key-brza_dugmad [data-testid="stButton"] button {min-height: 2.75rem; font-size: .9rem; padding: .25rem .5rem;}
+/* kartice soba – sve iste veličine */
+[class*="st-key-kartica_"] {padding: .55rem .65rem !important; gap: 0 !important; border-radius: 14px !important; cursor: pointer; transition: transform .08s ease;}
 [class*="st-key-kartica_"]:active {transform: scale(.97);}
+[class*="st-key-kartica_zauzeta_"] {background: rgba(220,38,38,.08) !important; border-color: rgba(220,38,38,.45) !important;}
+[class*="st-key-kartica_slobodna_"] {background: rgba(22,163,74,.08) !important; border-color: rgba(22,163,74,.45) !important;}
+[class*="st-key-kartica_"] [data-testid="stButton"] button {min-height: 2.2rem;}
 .kartice-dodir [class*="st-key-kartica_"] [data-testid="stButton"] {display: none !important;}
-.st-key-brza_dugmad {position: sticky; top: 3.75rem; z-index: 50; padding: .5rem; margin: 0 -.5rem; border-radius: 16px; background: rgba(127,127,127,.12); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);}.kartice-dodir [class*="st-key-kartica_"] .stElementContainer:has([data-testid="stButton"]) {display: none !important;}
-.kartica {position: relative;}
-.kartica .br {font-size: 1.1rem; font-weight: 700;}
-.kartica .placanje {position: absolute; top: -.15rem; right: -.15rem; width: 1.75rem; height: 1.75rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .95rem; font-weight: 800; color: #fff; line-height: 1;}
-.kartica .placanje.da {background: #16a34a;}
-.kartica .placanje.ne {background: #f59e0b;}
-.datum-naslov {font-size: 1.35rem; font-weight: 700; line-height: 1.3; text-align: center; margin: 0;}
-.datum-naslov .nije-danas {display: block; font-size: .8rem; font-weight: 600; opacity: .6;}
-.kartica .status {display: inline-block; margin-top: .35rem; padding: .2rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 700; letter-spacing: .05em; color: #fff;}
+.kartice-dodir [class*="st-key-kartica_"] .stElementContainer:has([data-testid="stButton"]) {display: none !important;}
+.kartica {position: relative; height: 5.5rem; overflow: hidden;}
+.kartica .glava {display: flex; align-items: center; gap: .4rem; font-size: 1rem; line-height: 1.5rem; padding-right: 1.6rem; white-space: nowrap;}
+.kartica .status {display: inline-block; padding: .08rem .4rem; border-radius: 999px; font-size: .58rem; font-weight: 700; letter-spacing: .04em; color: #fff; line-height: 1.2;}
 .kartica .status.s {background: #15803d;}
 .kartica .status.z {background: #dc2626;}
-.kartica .gost {margin-top: .45rem; font-size: .85rem; line-height: 1.35; opacity: .85; overflow-wrap: anywhere;}
-.kartica .cijena {margin-top: .3rem; font-size: .9rem; font-weight: 700;}
-.kartica .ko {margin-top: .35rem; font-size: .7rem; line-height: 1.3; opacity: .55; overflow-wrap: anywhere;}
-@media (max-width: 640px) {
-  .st-key-sobe_mreza [data-testid="stHorizontalBlock"] {flex-wrap: wrap !important; gap: .6rem !important;}
-  .st-key-sobe_mreza [data-testid="stColumn"] {flex: 1 1 calc(50% - .6rem) !important; width: calc(50% - .6rem) !important; min-width: calc(50% - .6rem) !important;}
-}
+.kartica .gost, .kartica .info, .kartica .cijena, .kartica .ko {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.kartica .gost {font-size: .88rem; font-weight: 600; line-height: 1.25rem;}
+.kartica .info {font-size: .74rem; line-height: 1.05rem; opacity: .75;}
+.kartica .cijena {font-size: .8rem; font-weight: 700; line-height: 1.15rem;}
+.kartica .ko {font-size: .6rem; line-height: .95rem; opacity: .55;}
+.kartica .prazno {margin-top: .35rem; white-space: normal;}
+.kartica .placanje {position: absolute; top: .05rem; right: 0; width: 1.35rem; height: 1.35rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 800; color: #fff; line-height: 1;}
+.kartica .placanje.da {background: #16a34a;}
+.kartica .placanje.ne {background: #f59e0b;}
 .kal-okvir {overflow-x: auto; margin: .25rem 0 1rem;}
 table.kal {width: 100%; min-width: 320px; border-collapse: separate !important; border-spacing: 3px; table-layout: fixed; font-size: .8rem; border: none !important; margin: 0;}
 table.kal tr {background: transparent !important;}
@@ -1041,42 +1051,88 @@ def stranica_prijava() -> None:
                 st.error("Pogrešan e-mail ili lozinka.")
 
 
-def zaglavlje() -> None:
-    uloga = "Admin" if je_admin() else "Zaposleni"
-    with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center"):
-        st.caption(f"{uloga}: **{md(ime_korisnika())}**")
-        st.button("Odjava", key="odjava", on_click=_odjava, type="tertiary", icon=":material/logout:")
+UPUTSTVO_IKONICA = (
+    "Ovaj telefon pamti prijavu dok ne pritisneš **Odjava**.\n\n"
+    "Da dodaš ikonicu na početni ekran:\n"
+    "- **iPhone (Safari):** dugme za dijeljenje (kvadrat sa strelicom) → "
+    "**Add to Home Screen / Dodaj na početni ekran** → **Add / Dodaj**\n"
+    "- **Android (Chrome):** meni **⋮** → **Add to Home screen / Dodaj na početni ekran** → "
+    "ako pita, izaberi **Create shortcut / Napravi prečicu**\n\n"
+    "Kad prvi put otvoriš ikonicu, prijavi se još jednom. Poslije toga ulaziš direktno.\n\n"
+    "Ako se telefon izgubi, promijeni ADMIN_LOZINKA u Secrets na Streamlitu. "
+    "Tako se poništavaju sve zapamćene prijave."
+)
 
 
-# ── Početna: status soba danas ───────────────────────────────────────────────
+def je_telefon() -> bool:
+    """Telefon → sobe i dugmad po 2 u redu; računar/tablet → po 4."""
+    try:
+        ua = str(st.context.headers.get("user-agent") or "").lower()
+    except Exception:
+        return False
+    return any(oznaka in ua for oznaka in ("iphone", "ipod", "android", "mobile"))
 
-def ko_je_upisao_html(r: dict) -> str:
-    tekst = f"upisao {esc(r['upisao'])} · {fmt_dtk(r['kreirano'])}"
-    if r.get("uredio"):
-        tekst += f"<br>uredio {esc(r['uredio'])} · {fmt_dtk(r['uredjeno'])}"
-    return tekst
 
+def kratki_datum(d: date) -> str:
+    return f"{DANI[d.weekday()]}, {d.day}.{d.month}." if je_telefon() else dugi_datum(d)
+
+
+def glavni_meni(grupe: dict[str, list]) -> None:
+    """Dugme ☰ Meni: sve stranice, uputstvo za ikonicu i odjava."""
+    with st.popover("Meni", icon=":material/menu:", key="glavni_meni"):
+        st.caption(f"Prijavljen: **{md(ime_korisnika())}**" + (" (admin)" if je_admin() else ""))
+        for naziv_grupe, stranice in grupe.items():
+            if naziv_grupe:
+                st.caption(naziv_grupe)
+            for stranica in stranice:
+                st.page_link(stranica, width="stretch")
+        st.divider()
+        with st.expander("Ikonica na telefonu", icon=":material/smartphone:"):
+            st.markdown(UPUTSTVO_IKONICA)
+        st.button("Odjava", key="odjava", on_click=_odjava, icon=":material/logout:", width="stretch")
+
+
+def zaglavlje(grupe: dict[str, list], na_pocetnoj: bool) -> None:
+    """Gornji red na svakoj stranici: ☰ Meni, a na Početnoj i ◀ datum ▶."""
+    with st.container(horizontal=True, wrap=False, vertical_alignment="center", key="zaglavlje"):
+        glavni_meni(grupe)
+        if na_pocetnoj:
+            dan = izabrani_dan()
+            st.button("◀", key="dan_nazad", on_click=_pomjeri_dan, args=(-1,), help="Prethodni dan")
+            oznaka = "" if dan == danas() else '<span class="nije-danas">nije danas</span>'
+            st.markdown(f'<p class="datum-naslov">{esc(kratki_datum(dan))}{oznaka}</p>', unsafe_allow_html=True)
+            st.button("▶", key="dan_naprijed", on_click=_pomjeri_dan, args=(1,), help="Sljedeći dan")
+        else:
+            st.markdown(f'<p class="korisnik">{esc(ime_korisnika())}</p>', unsafe_allow_html=True)
+    if na_pocetnoj and izabrani_dan() != danas():
+        st.button("Vrati na danas", key="dan_danas", on_click=_vrati_na_danas, icon=":material/today:")
+
+
+# ── Početna: status soba ─────────────────────────────────────────────────────
 
 def kartica_sobe(s: int, r: dict | None, dan: date) -> None:
-    """Jedna soba: zauzeta (crveno) ili slobodna (zeleno).
+    """Jedna soba, uvijek iste veličine: zauzeta (crveno) ili slobodna (zeleno).
 
     Dodir bilo gdje na karticu pritiska njeno dugme (skripta u ubaci_skriptu), a samo
     dugme se tada sakrije. Ako skripta ne radi, dugme ostaje vidljivo kao rezerva.
     """
     if r:
         with st.container(border=True, key=f"kartica_zauzeta_{s}"):
-            placeno = int(r.get("placeno") or 0)
             znacka = (
                 '<span class="placanje da" title="Plaćeno">✓</span>'
-                if placeno
+                if int(r.get("placeno") or 0)
                 else '<span class="placanje ne" title="Čeka plaćanje">€</span>'
             )
+            ko = f"upisao {esc(r['upisao'])} · {fmt_dtk(r['kreirano'])}"
+            if r.get("uredio"):
+                ko += f" · uredio {esc(r['uredio'])} · {fmt_dtk(r['uredjeno'])}"
             st.markdown(
-                f'<div class="kartica">{znacka}<div class="br">Soba {s}</div>'
-                f'<span class="status z">ZAUZETA</span>'
-                f'<div class="gost">{esc(r["gost"])}<br>do {fmt_dk(r["check_out"])}</div>'
+                f'<div class="kartica">{znacka}'
+                f'<div class="glava"><b>Soba {s}</b><span class="status z">ZAUZETA</span></div>'
+                f'<div class="gost">{esc(r["gost"])}</div>'
+                f'<div class="info">do {fmt_dk(r["check_out"])}</div>'
                 f'<div class="cijena">{cijena_tekst(r["cijena"])}</div>'
-                f'<div class="ko">{ko_je_upisao_html(r)}</div></div>',
+                f'<div class="ko">{ko}</div></div>',
                 unsafe_allow_html=True,
             )
             if st.button("Otvori", key=f"otvori_sobu_{s}", icon=":material/edit_note:", width="stretch"):
@@ -1084,8 +1140,9 @@ def kartica_sobe(s: int, r: dict | None, dan: date) -> None:
     else:
         with st.container(border=True, key=f"kartica_slobodna_{s}"):
             st.markdown(
-                f'<div class="kartica"><div class="br">Soba {s}</div>'
-                f'<span class="status s">SLOBODNA</span></div>',
+                f'<div class="kartica"><div class="glava"><b>Soba {s}</b>'
+                f'<span class="status s">SLOBODNA</span></div>'
+                f'<div class="info prazno">Dodirni za rezervaciju</div></div>',
                 unsafe_allow_html=True,
             )
             if st.button("Rezerviši", key=f"rezervisi_sobu_{s}", icon=":material/add:", width="stretch"):
@@ -1093,10 +1150,11 @@ def kartica_sobe(s: int, r: dict | None, dan: date) -> None:
 
 
 def kartice_soba(zauzete: dict[int, dict], dan: date) -> None:
-    with st.container(key="sobe_mreza"):
-        for pocetak in range(0, len(SOBE), 4):
-            kolone = st.columns(4)
-            for kolona, s in zip(kolone, SOBE[pocetak:pocetak + 4]):
+    po_redu = 2 if je_telefon() else 4
+    with st.container(key="sobe_mreza", gap="small"):
+        for pocetak in range(0, len(SOBE), po_redu):
+            kolone = st.columns(po_redu, wrap=False, gap="small")
+            for kolona, s in zip(kolone, SOBE[pocetak:pocetak + po_redu]):
                 with kolona:
                     kartica_sobe(s, zauzete.get(s), dan)
 
@@ -1114,7 +1172,7 @@ def stanje_soba_uzivo() -> None:
 
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Dolasci danas" if je_danas else "Dolasci")
+        st.markdown(f"**{'Dolasci danas' if je_danas else 'Dolasci'}**")
         dolasci = dolasci_na_dan(dan)
         if not dolasci:
             st.caption("Nema dolazaka.")
@@ -1126,7 +1184,7 @@ def stanje_soba_uzivo() -> None:
             )
             st.caption(f"upisao {r['upisao']} · {fmt_dtk(r['kreirano'])}")
     with c2:
-        st.subheader("Odlasci danas" if je_danas else "Odlasci")
+        st.markdown(f"**{'Odlasci danas' if je_danas else 'Odlasci'}**")
         odlasci = odlasci_na_dan(dan)
         if not odlasci:
             st.caption("Nema odlazaka.")
@@ -1140,18 +1198,24 @@ def kalendar_uzivo() -> None:
 
 
 def brza_dugmad() -> None:
-    """Glavna dugmad na vrhu Početne – ostaju vidljiva i dok se lista sobe (CSS sticky)."""
-    with st.container(horizontal=True, key="brza_dugmad"):
-        if st.button("Kraj smjene", icon=":material/point_of_sale:", width="stretch", key="brzo_smjena"):
-            st.switch_page(STRANICE["smjena"])
-        if je_admin() and st.button(
-            "Nabavka", icon=":material/shopping_cart:", width="stretch", key="brzo_nabavka"
-        ):
-            st.switch_page(STRANICE["nabavka"])
-        if st.button("Nova rezervacija", icon=":material/hotel:", width="stretch", key="brzo_rezervacija"):
-            st.switch_page(STRANICE["smjestaj"])
-        if st.button("Kalendar", icon=":material/calendar_month:", width="stretch", key="brzo_kalendar"):
-            st.switch_page(STRANICE["kalendar"])
+    """Glavna dugmad na vrhu Početne, uredno poređana (2 u redu na telefonu)."""
+    dugmad = [("Kraj smjene", ":material/point_of_sale:", "brzo_smjena", "smjena")]
+    if je_admin():
+        dugmad.append(("Nabavka", ":material/shopping_cart:", "brzo_nabavka", "nabavka"))
+    dugmad += [
+        ("Nova rezervacija", ":material/hotel:", "brzo_rezervacija", "smjestaj"),
+        ("Kalendar", ":material/calendar_month:", "brzo_kalendar", "kalendar"),
+    ]
+    po_redu = (2 if len(dugmad) == 4 else 3) if je_telefon() else len(dugmad)
+    if je_telefon() and po_redu == 3:  # tri dugmeta u jednom redu – kraći nazivi
+        dugmad = [(n.replace("Kraj smjene", "Smjena").replace("Nova rezervacija", "Rezervacija"), i, k, s)
+                  for n, i, k, s in dugmad]
+    with st.container(key="brza_dugmad", gap="small"):
+        for pocetak in range(0, len(dugmad), po_redu):
+            kolone = st.columns(po_redu, wrap=False, gap="small")
+            for kolona, (naziv, ikona, kljuc, stranica) in zip(kolone, dugmad[pocetak:pocetak + po_redu]):
+                if kolona.button(naziv, icon=ikona, width="stretch", key=kljuc):
+                    st.switch_page(STRANICE[stranica])
 
 
 def izabrani_dan() -> date:
@@ -1167,37 +1231,11 @@ def _vrati_na_danas() -> None:
     st.session_state["pocetna_pomak"] = 0
 
 
-def red_sa_datumom() -> None:
-    """◀  Subota, 24. oktobra 2026.  ▶  – listanje dana naprijed i nazad."""
-    dan = izabrani_dan()
-    with st.container(horizontal=True, wrap=False, vertical_alignment="center", key="pocetna_datum"):
-        st.button("◀", key="dan_nazad", on_click=_pomjeri_dan, args=(-1,), help="Prethodni dan")
-        oznaka = "" if dan == danas() else '<span class="nije-danas">nije danas</span>'
-        st.markdown(f'<p class="datum-naslov">{esc(dugi_datum(dan))}{oznaka}</p>', unsafe_allow_html=True)
-        st.button("▶", key="dan_naprijed", on_click=_pomjeri_dan, args=(1,), help="Sljedeći dan")
-    if dan != danas():
-        st.button("Vrati na danas", key="dan_danas", on_click=_vrati_na_danas, icon=":material/today:")
-
-
 def stranica_pocetna() -> None:
     zapamti_uredjaj()
-    red_sa_datumom()
     brza_dugmad()
     prikazi_poruku()
     stanje_soba_uzivo()
-
-    with st.expander("Ikonica na telefonu", icon=":material/smartphone:"):
-        st.markdown(
-            "Ovaj telefon pamti prijavu dok ne pritisneš **Odjava**.\n\n"
-            "Da dodaš ikonicu na početni ekran:\n"
-            "- **iPhone (Safari):** dugme za dijeljenje (kvadrat sa strelicom) → "
-            "**Add to Home Screen / Dodaj na početni ekran** → **Add / Dodaj**\n"
-            "- **Android (Chrome):** meni **⋮** → **Add to Home screen / Dodaj na početni ekran** → "
-            "ako pita, izaberi **Create shortcut / Napravi prečicu**\n\n"
-            "Kad prvi put otvoriš ikonicu, prijavi se još jednom. Poslije toga ulaziš direktno.\n\n"
-            "Ako se telefon izgubi, promijeni ADMIN_LOZINKA u Secrets na Streamlitu. "
-            "Tako se poništavaju sve zapamćene prijave."
-        )
 
 
 # ── Prozor (dijalog) za sobu: pregled, uređivanje, otkazivanje ───────────────
@@ -2361,8 +2399,6 @@ def main() -> None:
         ubaci_skriptu()
         return
 
-    zaglavlje()
-
     STRANICE.clear()
     STRANICE.update(
         {
@@ -2405,9 +2441,12 @@ def main() -> None:
             "Admin": [STRANICE[k] for k in ("nabavka", "izvjestaji", "artikli", "narudzbine", "podesavanja")],
         }
     else:
-        meni = rad
+        meni = {"": rad}
 
-    st.navigation(meni, position="top").run()
+    # Streamlit-ov meni je skriven – navigacija ide preko dugmeta ☰ Meni u zaglavlju
+    stranica = st.navigation(meni, position="hidden")
+    zaglavlje(meni, na_pocetnoj=stranica.title == "Početna")
+    stranica.run()
     prikazi_dijalog()
     ubaci_skriptu()
 
