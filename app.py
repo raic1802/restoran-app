@@ -190,7 +190,11 @@ MIGRACIJE: list[list[str]] = [
     [
         "ALTER TABLE rezervacije ADD COLUMN placeno INTEGER NOT NULL DEFAULT 0",
     ],
-    # ── verzija 4: ovdje dodaj buduće izmjene, npr. ─────────────────────────
+    # ── verzija 4: kome je narudžba poslata ──────────────────────────────────
+    [
+        "ALTER TABLE narudzbine ADD COLUMN primalac TEXT NOT NULL DEFAULT ''",
+    ],
+    # ── verzija 5: ovdje dodaj buduće izmjene, npr. ─────────────────────────
     # ["ALTER TABLE artikli ADD COLUMN jedinica TEXT NOT NULL DEFAULT ''"],
 ]
 
@@ -364,15 +368,42 @@ def obrisi_artikal(id_: int) -> None:
     izvrsi("DELETE FROM artikli WHERE id = :id", id=id_)
 
 
+def obrisi_artikle(ids: list[int]) -> int:
+    """Trajno briše više artikala odjednom (u jednoj transakciji)."""
+    with baza().begin() as conn:
+        for id_ in ids:
+            conn.execute(text("DELETE FROM artikli WHERE id = :id"), {"id": int(id_)})
+    st.cache_data.clear()
+    return len(ids)
+
+
 # ── Narudžbine ───────────────────────────────────────────────────────────────
 
-def sacuvaj_narudzbinu(narucio: str, stavke: list[dict], napomena: str, poruka: str, trenutak: datetime) -> None:
+def sacuvaj_narudzbinu(
+    narucio: str, stavke: list[dict], napomena: str, poruka: str, trenutak: datetime, primalac: str = ""
+) -> None:
     izvrsi(
-        """INSERT INTO narudzbine (kreirano, narucio, stavke, napomena, poruka)
-           VALUES (:t, :n, :s, :nap, :p)""",
+        """INSERT INTO narudzbine (kreirano, narucio, stavke, napomena, poruka, primalac)
+           VALUES (:t, :n, :s, :nap, :p, :pr)""",
         t=trenutak.isoformat(sep=" "), n=narucio, s=json.dumps(stavke, ensure_ascii=False),
-        nap=napomena, p=poruka,
+        nap=napomena, p=poruka, pr=primalac,
     )
+
+
+def primaoci() -> list[dict]:
+    """Brojevi kojima admin šalje spisak za nabavku, npr. [{"ime": "Tata", "telefon": "+382…"}]."""
+    try:
+        lista = json.loads(procitaj_podesavanje("primaoci", "[]") or "[]")
+    except ValueError:
+        lista = []
+    lista = [p for p in lista if isinstance(p, dict) and p.get("ime") and p.get("telefon")]
+    if not lista and procitaj_podesavanje("telefon_nabavke"):
+        lista = [{"ime": "Dobavljač", "telefon": procitaj_podesavanje("telefon_nabavke")}]
+    return lista
+
+
+def sacuvaj_primaoce(lista: list[dict]) -> None:
+    sacuvaj_podesavanje("primaoci", json.dumps(lista, ensure_ascii=False))
 
 
 @citanje
@@ -781,16 +812,26 @@ def iznos(oznaka: str, kljuc: str):
 # ── Narudžbe: poruka i linkovi ───────────────────────────────────────────────
 
 def sastavi_poruku(stavke: list[dict], napomena: str, narucio: str, trenutak: datetime) -> str:
+    """Spisak za nabavku, složen po kategorijama:
+
+    NABAVKA – Vidikovac
+    24.10.2026. 09:15 · Admin
+
+    PIĆE (2):
+    • Coca-Cola 0,25 l
+    • Kisjela voda
+    """
     naziv = procitaj_podesavanje("naziv_objekta", "Restoran")
-    linije = [f"NARUDŽBINA – {naziv}", f"{fmt_dt(trenutak)} · {narucio}"]
-    trenutna_kategorija = None
+    po_kategoriji: dict[str, list[str]] = {}
     for s in stavke:
-        if s["kategorija"] != trenutna_kategorija:
-            linije += ["", f"{s['kategorija'].upper()}:"]
-            trenutna_kategorija = s["kategorija"]
-        linije.append(f"• {s['naziv']}")
+        po_kategoriji.setdefault(s["kategorija"], []).append(s["naziv"])
+    linije = [f"NABAVKA – {naziv}", f"{fmt_dt(trenutak)} · {narucio}"]
+    for kategorija, nazivi in po_kategoriji.items():
+        linije += ["", f"{kategorija.upper()} ({len(nazivi)}):"]
+        linije += [f"• {n}" for n in nazivi]
     if napomena.strip():
         linije += ["", f"Napomena: {napomena.strip()}"]
+    linije += ["", f"Ukupno artikala: {len(stavke)}"]
     return "\n".join(linije)
 
 
@@ -1103,7 +1144,9 @@ def brza_dugmad() -> None:
     with st.container(horizontal=True, key="brza_dugmad"):
         if st.button("Kraj smjene", icon=":material/point_of_sale:", width="stretch", key="brzo_smjena"):
             st.switch_page(STRANICE["smjena"])
-        if st.button("Nabavka", icon=":material/shopping_cart:", width="stretch", key="brzo_nabavka"):
+        if je_admin() and st.button(
+            "Nabavka", icon=":material/shopping_cart:", width="stretch", key="brzo_nabavka"
+        ):
             st.switch_page(STRANICE["nabavka"])
         if st.button("Nova rezervacija", icon=":material/hotel:", width="stretch", key="brzo_rezervacija"):
             st.switch_page(STRANICE["smjestaj"])
@@ -1463,21 +1506,38 @@ def _zatvori_narudzbinu() -> None:
 
 
 def prikazi_rezultat_narudzbine(rezultat: dict) -> None:
-    st.success(f"Narudžbina je sačuvana ({rezultat['broj']} art.). Izaberi kako je šalješ:")
-    telefon = procitaj_podesavanje("telefon_nabavke")
+    ime, telefon = rezultat.get("primalac", ""), rezultat.get("telefon", "")
+    st.success(
+        f"Spisak je spreman ({rezultat['broj']} art.)"
+        + (f" za: **{md(ime)}**. Pritisni WhatsApp i u otvorenom razgovoru samo pošalji." if ime else ".")
+    )
     linkovi = linkovi_za_poruku(rezultat["poruka"], telefon)
     with st.container(horizontal=True):
-        st.link_button("WhatsApp", linkovi["whatsapp"], type="primary", width="stretch")
+        st.link_button(
+            f"WhatsApp – {ime}" if ime else "WhatsApp", linkovi["whatsapp"], type="primary",
+            width="stretch", icon=":material/send:",
+        )
+        st.link_button(f"SMS – {ime}" if ime else "SMS", linkovi["sms"], width="stretch")
         st.link_button("Viber", linkovi["viber"], width="stretch")
-        st.link_button("SMS", linkovi["sms"], width="stretch")
+    st.caption("Viber ne dozvoljava direktan broj sa tekstom, pa tamo biraš kontakt sam.")
+
+    ostali = [p for p in primaoci() if p["ime"] != ime]
+    if ostali:
+        with st.expander("Pošalji isti spisak i nekom drugom"):
+            with st.container(horizontal=True):
+                for p in ostali:
+                    st.link_button(
+                        f"WhatsApp – {p['ime']}",
+                        linkovi_za_poruku(rezultat["poruka"], p["telefon"])["whatsapp"],
+                        width="stretch",
+                    )
     with st.expander("Tekst poruke (za kopiranje)"):
         st.code(rezultat["poruka"], language=None, wrap_lines=True)
-    if not telefon:
-        st.caption("Admin u „Podešavanjima“ može upisati broj dobavljača, pa se poruka otvara direktno njemu.")
     st.button("Gotovo", key="nab_gotovo", on_click=_zatvori_narudzbinu)
 
 
 def stranica_nabavka() -> None:
+    samo_admin()
     st.title("Nabavka")
 
     rezultat = st.session_state.get("nab_rezultat")
@@ -1522,14 +1582,26 @@ def stranica_nabavka() -> None:
     if not izabrani.empty:
         st.markdown(f"**Odabrano ({len(izabrani)}):** " + ", ".join(md(n) for n in izabrani["naziv"]))
 
+    lista = primaoci()
+    imena = [p["ime"] for p in lista]
+    if imena:
+        primalac = st.pills("Kome šalješ spisak?", imena, default=imena[0], key="nab_primalac")
+    else:
+        primalac = None
+        st.caption("Dodaj brojeve (npr. Tata, Mama) u „Podešavanjima“, pa se spisak šalje direktno njima.")
+
     if st.button(
-        "Pošalji narudžbinu", type="primary", width="stretch", disabled=izabrani.empty, key="nab_posalji"
+        "Pošalji narudžbinu", type="primary", width="stretch", disabled=izabrani.empty, key="nab_posalji",
+        icon=":material/send:",
     ):
         trenutak = sada()
         stavke = [{"naziv": r.naziv, "kategorija": r.kategorija} for r in izabrani.itertuples(index=False)]
         poruka = sastavi_poruku(stavke, napomena, ime_korisnika(), trenutak)
-        sacuvaj_narudzbinu(ime_korisnika(), stavke, ocisti(napomena), poruka, trenutak)
-        st.session_state["nab_rezultat"] = {"poruka": poruka, "broj": len(stavke)}
+        telefon = next((p["telefon"] for p in lista if p["ime"] == primalac), "")
+        sacuvaj_narudzbinu(ime_korisnika(), stavke, ocisti(napomena), poruka, trenutak, primalac or "")
+        st.session_state["nab_rezultat"] = {
+            "poruka": poruka, "broj": len(stavke), "primalac": primalac or "", "telefon": telefon,
+        }
         st.session_state["nab_odabrani"] = set()
         zakazi_reset("nab_napomena", "nab_pretraga")
         st.rerun()
@@ -1540,8 +1612,9 @@ def stranica_nabavka() -> None:
             for n in posljednje:
                 stavke = json.loads(n["stavke"] or "[]")
                 st.markdown(
-                    f"**{fmt_dt(n['kreirano'])}** · {md(n['narucio'])}  \n"
-                    + ", ".join(md(s["naziv"]) for s in stavke)
+                    f"**{fmt_dt(n['kreirano'])}** · {md(n['narucio'])}"
+                    + (f" → {md(n['primalac'])}" if n.get("primalac") else "")
+                    + "  \n" + ", ".join(md(s["naziv"]) for s in stavke)
                 )
 
 
@@ -2128,10 +2201,28 @@ def stranica_artikli() -> None:
                 st.rerun()
 
     st.markdown(f"#### Svi artikli ({len(artikli)})")
-    st.dataframe(
+    st.caption("Za brisanje više artikala odjednom označi kvadratiće lijevo od artikala.")
+    dogadjaj = st.dataframe(
         artikli[["kategorija", "naziv"]].rename(columns={"kategorija": "Kategorija", "naziv": "Naziv"}),
         hide_index=True,
+        on_select="rerun",
+        selection_mode="multi-row",
+        key="art_tabela",
     )
+    redovi = [i for i in (dogadjaj.selection.rows if dogadjaj else []) if 0 <= i < len(artikli)]
+    if redovi:
+        oznaceni = artikli.iloc[redovi]
+        ids = [int(i) for i in oznaceni["id"]]
+        st.warning(f"Označeno za brisanje ({len(ids)}): " + ", ".join(md(n) for n in oznaceni["naziv"]))
+        potvrda = st.checkbox(f"Potvrđujem trajno brisanje ({len(ids)})", key="artb_potvrda")
+        if st.button(
+            f"Obriši označene ({len(ids)})", type="primary", disabled=not potvrda,
+            icon=":material/delete:", key="artb_dugme",
+        ):
+            obrisi_artikle(ids)
+            poruka_uspjeha(f"Trajno obrisano {len(ids)} artikala. Istorija ranijih narudžbi ostaje sačuvana.")
+            zakazi_reset("art_tabela", "artb_")
+            st.rerun()
 
 
 # ── Admin: istorija narudžbi ─────────────────────────────────────────────────
@@ -2152,7 +2243,8 @@ def stranica_narudzbine() -> None:
 
     for r in df.head(300).itertuples(index=False):
         stavke = json.loads(r.stavke or "[]")
-        with st.expander(f"{fmt_dt(r.kreirano)} · {r.narucio} · {len(stavke)} art."):
+        primalac = f" → {r.primalac}" if getattr(r, "primalac", "") else ""
+        with st.expander(f"{fmt_dt(r.kreirano)} · {r.narucio}{primalac} · {len(stavke)} art."):
             po_kategoriji: dict[str, list[str]] = {}
             for s in stavke:
                 po_kategoriji.setdefault(s["kategorija"], []).append(s["naziv"])
@@ -2189,19 +2281,43 @@ def stranica_podesavanja() -> None:
         naziv = st.text_input(
             "Naziv objekta", value=procitaj_podesavanje("naziv_objekta", "Restoran"), key="pod_naziv"
         )
-        telefon = st.text_input(
-            "Broj dobavljača za narudžbe (WhatsApp / Viber / SMS)",
-            value=procitaj_podesavanje("telefon_nabavke"),
-            placeholder="+382 67 123 456",
-            key="pod_telefon",
-        )
-        sacuvaj = st.form_submit_button("Sačuvaj", type="primary", width="stretch")
+        sacuvaj = st.form_submit_button("Sačuvaj naziv", type="primary", width="stretch")
     if sacuvaj:
         sacuvaj_podesavanje("naziv_objekta", ocisti(naziv) or "Restoran")
-        sacuvaj_podesavanje("telefon_nabavke", ocisti(telefon))
-        poruka_uspjeha("Podešavanja su sačuvana.")
+        poruka_uspjeha("Naziv je sačuvan.")
         zakazi_reset("pod_")
         st.rerun()
+
+    st.markdown("#### Brojevi za slanje nabavke")
+    st.caption("Kome admin šalje spisak za nabavku preko WhatsAppa ili SMS-a (npr. Tata, Mama, Ja).")
+    lista = primaoci()
+    if not lista:
+        st.caption("Još nema brojeva.")
+    for i, p in enumerate(lista):
+        with st.container(horizontal=True, vertical_alignment="center", border=True):
+            st.markdown(f"**{md(p['ime'])}** · {md(p['telefon'])}")
+            if st.button("Ukloni", key=f"prim_ukloni_{i}", icon=":material/delete:", type="tertiary"):
+                sacuvaj_primaoce([x for j, x in enumerate(lista) if j != i])
+                sacuvaj_podesavanje("telefon_nabavke", "")  # stari pojedinačni broj više se ne koristi
+                poruka_uspjeha(f"Uklonjen broj: {p['ime']}")
+                st.rerun()
+    with st.form("forma_primalac"):
+        ime = st.text_input("Ime", placeholder="npr. Tata", key="prim_ime")
+        telefon = st.text_input("Broj telefona", placeholder="+382 67 123 456", key="prim_tel")
+        dodaj = st.form_submit_button("Dodaj broj", width="stretch", icon=":material/person_add:")
+    if dodaj:
+        ime, telefon = ocisti(ime), ocisti(telefon)
+        if not ime:
+            st.error("Upiši ime (npr. Tata).")
+        elif len(normalizuj_telefon(telefon)) < 8:
+            st.error("Upiši ispravan broj telefona, npr. +382 67 123 456 ili 067 123 456.")
+        elif ime.casefold() in {p["ime"].casefold() for p in lista}:
+            st.error(f"Ime „{ime}“ već postoji na spisku.")
+        else:
+            sacuvaj_primaoce(lista + [{"ime": ime, "telefon": telefon}])
+            poruka_uspjeha(f"Dodat broj: {ime} · {telefon}")
+            zakazi_reset("prim_")
+            st.rerun()
 
     st.markdown("#### Sistem")
     if baza().dialect.name == "sqlite":
@@ -2252,9 +2368,6 @@ def main() -> None:
             "smjena": st.Page(
                 stranica_smjena, title="Kraj smjene", icon=":material/point_of_sale:", url_path="smjena"
             ),
-            "nabavka": st.Page(
-                stranica_nabavka, title="Nabavka", icon=":material/shopping_cart:", url_path="nabavka"
-            ),
             "smjestaj": st.Page(
                 stranica_smjestaj, title="Smještaj", icon=":material/hotel:", url_path="smjestaj"
             ),
@@ -2268,6 +2381,9 @@ def main() -> None:
     if je_admin():
         STRANICE.update(
             {
+                "nabavka": st.Page(
+                    stranica_nabavka, title="Nabavka", icon=":material/shopping_cart:", url_path="nabavka"
+                ),
                 "izvjestaji": st.Page(
                     stranica_izvjestaji, title="Izvještaji", icon=":material/bar_chart:", url_path="izvjestaji"
                 ),
@@ -2282,7 +2398,10 @@ def main() -> None:
                 ),
             }
         )
-        meni = {"Rad": rad, "Admin": [STRANICE[k] for k in ("izvjestaji", "artikli", "narudzbine", "podesavanja")]}
+        meni = {
+            "Rad": rad,
+            "Admin": [STRANICE[k] for k in ("nabavka", "izvjestaji", "artikli", "narudzbine", "podesavanja")],
+        }
     else:
         meni = rad
 
