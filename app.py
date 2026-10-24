@@ -878,31 +878,6 @@ h1 {font-size: 1.75rem !important;}
 .korisnik {margin: 0 0 0 auto; font-size: .85rem; opacity: .65; white-space: nowrap;}
 /* brza dugmad */
 .st-key-brza_dugmad [data-testid="stButton"] button {min-height: 2.75rem; font-size: .9rem; padding: .25rem .5rem;}
-/* kartice soba – sve iste veličine */
-[class*="st-key-kartica_"] {padding: .55rem .65rem !important; gap: 0 !important; border-radius: 14px !important; cursor: pointer; transition: transform .08s ease;}
-[class*="st-key-kartica_"]:active {transform: scale(.97);}
-[class*="st-key-kartica_zauzeta_"] {background: rgba(220,38,38,.08) !important; border-color: rgba(220,38,38,.45) !important;}
-[class*="st-key-kartica_slobodna_"] {background: rgba(22,163,74,.08) !important; border-color: rgba(22,163,74,.45) !important;}
-[class*="st-key-kartica_"] [data-testid="stButton"] button {min-height: 2.2rem;}
-.kartice-dodir [class*="st-key-kartica_"] [data-testid="stButton"] {display: none !important;}
-.kartice-dodir [class*="st-key-kartica_"] .stElementContainer:has([data-testid="stButton"]) {display: none !important;}
-.kartica {position: relative; height: 5rem; overflow: hidden;}
-.kartica .glava {display: flex; align-items: center; gap: .4rem; font-size: 1rem; line-height: 1.5rem; white-space: nowrap;}
-.kartica .status {display: inline-block; padding: .08rem .4rem; border-radius: 999px; font-size: .58rem; font-weight: 700; letter-spacing: .04em; color: #fff; line-height: 1.2;}
-.kartica .status.s {background: #15803d;}
-.kartica .status.z {background: #dc2626;}
-.kartica .gost, .kartica .lijevo {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-.kartica .red {display: flex; align-items: center; justify-content: space-between; gap: .3rem;}
-.kartica .lijevo {min-width: 0; flex: 1 1 auto;}
-.kartica .gost {font-size: .88rem; font-weight: 600; line-height: 1.25rem;}
-.kartica .info {font-size: .74rem; line-height: 1.05rem; opacity: .75;}
-.kartica .cijena {font-size: .8rem; font-weight: 700; line-height: 1.15rem;}
-.kartica .prazno {margin-top: .35rem; white-space: normal;}
-.kartica .pl {flex: none; padding: .08rem .38rem; border-radius: 999px; font-size: .55rem; font-weight: 800; letter-spacing: .03em; line-height: 1.25;}
-.kartica .pl.da {background: #16a34a; color: #fff;}
-.kartica .pl.ne {background: #fbbf24; color: #1f1f1f;}
-.kartica .dor {flex: none; display: inline-flex; align-items: center; gap: .2rem; font-size: .66rem; font-weight: 700; opacity: 1;}
-.ik-pribor {display: inline-block; width: .8rem; height: .8rem; background-color: currentColor; -webkit-mask: var(--pribor) center / contain no-repeat; mask: var(--pribor) center / contain no-repeat;}
 /* računar: sobe kao dnevni pregled Google Kalendara (iste boje) */
 .st-key-sobe_lista {background: #131314; border-radius: 24px; padding: 1rem 1.25rem 1.25rem; gap: 4px !important; margin-bottom: .75rem;}
 .gk-glava {display: flex; align-items: center; gap: .85rem; height: 3rem; padding: 0 0 .7rem .15rem; margin-bottom: .45rem; border-bottom: 1px solid #333537; box-sizing: content-box;}
@@ -919,6 +894,17 @@ h1 {font-size: 1.75rem !important;}
 .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {flex: none; margin-left: .5rem; padding: .18rem .6rem; border-radius: 999px; font-size: .7rem; font-weight: 700; letter-spacing: .05em; line-height: 1.2; white-space: nowrap;}
 .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::before {order: 2; padding-left: 1.45rem; border: 1px solid rgba(19,19,20,.45); color: #131314; background: var(--pribor-tamni) .5rem center / .8rem .8rem no-repeat;}
 .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {order: 3;}
+.st-key-sobe_lista [data-testid="stButton"] button > div {overflow: hidden;}
+.st-key-sobe_lista [data-testid="stButton"] button p {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+@media (max-width: 640px) {
+  .st-key-sobe_lista {padding: .75rem .7rem .9rem; border-radius: 18px;}
+  .st-key-sobe_lista [data-testid="stButton"] button {min-height: 2.35rem; padding: 0 .65rem;}
+  .st-key-sobe_lista [data-testid="stButton"] button p {font-size: .88rem;}
+  .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::before,
+  .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {margin-left: .35rem; padding: .14rem .45rem; font-size: .6rem;}
+  .gk-glava {height: 2.5rem; padding-bottom: .55rem; margin-bottom: .35rem;}
+  .gk-broj {width: 2.35rem; height: 2.35rem; font-size: 1.1rem;}
+}
 .st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button {background: transparent; border: 1px solid #333537; color: #9aa0a6;}
 .st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button:hover {background: #1e1f20; border-color: #5b8f64; color: #c4c7c5;}
 .kal-okvir {overflow-x: auto; margin: .25rem 0 1rem;}
@@ -938,8 +924,7 @@ table.kal tr.danas td {outline: 2px solid rgba(128,128,128,.55); outline-offset:
 def ubaci_stil() -> None:
     # ikonica viljuške i noža (doručak) – kao CSS varijable, da se koristi i na telefonu i na računaru
     ikone = (
-        f"<style>:root {{--pribor: {pribor_svg_url('#000')}; "
-        f"--pribor-tamni: {pribor_svg_url('#131314')};}}</style>"
+        f"<style>:root {{--pribor-tamni: {pribor_svg_url('#131314')};}}</style>"
     )
     st.markdown(CSS.replace("</style>", "</style>" + ikone, 1), unsafe_allow_html=True)
 
@@ -980,22 +965,6 @@ def ubaci_skriptu() -> None:
         kolacic('', 0);
       }
     }
-  } catch (e) {}
-
-  // ── dodir na karticu sobe otvara prozor (pritiska skriveno dugme u kartici) ──
-  try {
-    if (!window.__karticeDodir) {
-      window.__karticeDodir = true;
-      document.addEventListener('click', function (e) {
-        var cilj = e.target;
-        if (!cilj || !cilj.closest) return;
-        var kartica = cilj.closest('[class*="st-key-kartica_"]');
-        if (!kartica || cilj.closest('button')) return;
-        var dugme = kartica.querySelector('[data-testid="stButton"] button');
-        if (dugme) { dugme.click(); }
-      });
-    }
-    document.documentElement.classList.add('kartice-dodir');
   } catch (e) {}
 
   // ── ikonica na početnom ekranu ──
@@ -1105,6 +1074,26 @@ def pribor_svg_url(boja: str) -> str:
     return 'url("data:image/svg+xml,' + quote(svg, safe="/:=' ") + '")'
 
 
+def cijena_kratko(iznos) -> str:
+    """Kraća cijena za usku traku na telefonu: 54 €, 58,50 €, NA UPIT."""
+    v = broj(iznos)
+    if v == 0:
+        return "NA UPIT"
+    return f"{int(v)} €" if v == int(v) else eur(v)
+
+
+def natpis_trake(s: int, r: dict, telefon: bool) -> str:
+    """Natpis zauzete sobe: broj sobe, ime gosta, cijena (kao u Google Kalendaru).
+
+    Na telefonu ide cijena prije imena: predugo ime se samo skrati sa „…“ (wrap=False)
+    koliko god je ekran uzak, a broj sobe i cijena uvijek ostaju vidljivi.
+    """
+    ime = md(ocisti(r["gost"]))
+    if telefon:
+        return f"**{s}**  {cijena_kratko(r['cijena'])}  ·  {ime}"
+    return f"**{s}**  {ime}  ·  {cijena_tekst(r['cijena'])}"
+
+
 def ima_dorucak(r: dict) -> bool:
     """Rezervacije preko Bookinga imaju uključen doručak."""
     return str(r.get("izvor") or "") == "Booking"
@@ -1156,61 +1145,15 @@ def zaglavlje(grupe: dict[str, list], na_pocetnoj: bool) -> None:
 
 # ── Početna: status soba ─────────────────────────────────────────────────────
 
-def kartica_sobe(s: int, r: dict | None, dan: date) -> None:
-    """Jedna soba, uvijek iste veličine: zauzeta (crveno) ili slobodna (zeleno).
-
-    Dodir bilo gdje na karticu pritiska njeno dugme (skripta u ubaci_skriptu), a samo
-    dugme se tada sakrije. Ako skripta ne radi, dugme ostaje vidljivo kao rezerva.
-    """
-    if r:
-        with st.container(border=True, key=f"kartica_zauzeta_{s}"):
-            placanje = (
-                '<span class="pl da">PLAĆENO</span>' if int(r.get("placeno") or 0)
-                else '<span class="pl ne">NIJE PLAĆENO</span>'
-            )
-            dorucak = '<span class="dor"><i class="ik-pribor"></i>doručak</span>' if ima_dorucak(r) else ""
-            cijena_kratko = "NA UPIT" if broj(r["cijena"]) == 0 else eur(r["cijena"])  # kartica je uska
-            # ko je upisao / uredio prikazuje se u prozoru sobe (dodir na karticu)
-            st.markdown(
-                f'<div class="kartica">'
-                f'<div class="glava"><b>Soba {s}</b><span class="status z">ZAUZETA</span></div>'
-                f'<div class="gost">{esc(r["gost"])}</div>'
-                f'<div class="red info"><span class="lijevo">do {fmt_dk(r["check_out"])}</span>{dorucak}</div>'
-                f'<div class="red cijena"><span class="lijevo">{cijena_kratko}</span>{placanje}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-            if st.button("Otvori", key=f"otvori_sobu_{s}", icon=":material/edit_note:", width="stretch"):
-                otvori_dijalog({"tip": "rezervacija", "id": int(r["id"])})
-    else:
-        with st.container(border=True, key=f"kartica_slobodna_{s}"):
-            st.markdown(
-                f'<div class="kartica"><div class="glava"><b>Soba {s}</b>'
-                f'<span class="status s">SLOBODNA</span></div>'
-                f'<div class="info prazno">Dodirni za rezervaciju</div></div>',
-                unsafe_allow_html=True,
-            )
-            if st.button("Rezerviši", key=f"rezervisi_sobu_{s}", icon=":material/add:", width="stretch"):
-                otvori_dijalog({"tip": "nova", "soba": s, "dan": dan.isoformat()})
-
-
-def kartice_soba(zauzete: dict[int, dict], dan: date) -> None:
-    po_redu = 2 if je_telefon() else 4
-    with st.container(key="sobe_mreza", gap="small"):
-        for pocetak in range(0, len(SOBE), po_redu):
-            kolone = st.columns(po_redu, wrap=False, gap="small")
-            for kolona, s in zip(kolone, SOBE[pocetak:pocetak + po_redu]):
-                with kolona:
-                    kartica_sobe(s, zauzete.get(s), dan)
-
-
 def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
-    """Računar: sobe jedna ispod druge, kao dnevni pregled u Google Kalendaru.
+    """Sobe jedna ispod druge, kao dnevni pregled u Google Kalendaru (računar i telefon).
 
-    Traka prikazuje broj sobe i cijenu; sve ostalo se vidi dodirom (prozor sobe).
-    Oznake plaćanja i doručka idu na desni kraj trake (CSS ::after, bez JavaScripta).
+    Traka prikazuje broj sobe, ime gosta i cijenu; sve ostalo se vidi dodirom (prozor sobe).
+    Oznake plaćanja i doručka idu na desni kraj trake (CSS ::before / ::after, bez JavaScripta).
+    Na telefonu je oznaka doručka samo viljuška i nož, da sve stane u jedan red.
     """
     slobodno = BROJ_SOBA - len(zauzete)
+    telefon = je_telefon()
     placeno, nije, dorucak = [], [], []
     with st.container(key="sobe_lista", gap="xxsmall"):
         st.html(
@@ -1225,12 +1168,10 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
                 (placeno if int(r.get("placeno") or 0) else nije).append(sel + "::after")
                 if ima_dorucak(r):
                     dorucak.append(sel + "::before")
-                if st.button(
-                    f"**Soba {s}**  ·  {cijena_tekst(r['cijena'])}", key=f"otvori_sobu_{s}", width="stretch"
-                ):
+                if st.button(natpis_trake(s, r, telefon), key=f"otvori_sobu_{s}", width="stretch", wrap=False):
                     otvori_dijalog({"tip": "rezervacija", "id": int(r["id"])})
             else:
-                if st.button(f"**Soba {s}**  ·  slobodna", key=f"rezervisi_sobu_{s}", width="stretch"):
+                if st.button(f"**{s}**  slobodna", key=f"rezervisi_sobu_{s}", width="stretch", wrap=False):
                     otvori_dijalog({"tip": "nova", "soba": s, "dan": dan.isoformat()})
     pravila = []
     if placeno:
@@ -1238,7 +1179,14 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
     if nije:
         pravila.append(", ".join(nije) + ' {content: "NIJE PLAĆENO"; background: #fdd663; color: #131314;}')
     if dorucak:
-        pravila.append(", ".join(dorucak) + ' {content: "DORUČAK";}')
+        if telefon:
+            pravila.append(
+                ", ".join(dorucak)
+                + ' {content: ""; width: 1.55rem !important; height: 1.3rem !important; padding: 0 !important;'
+                + ' background-position: center !important;}'
+            )
+        else:
+            pravila.append(", ".join(dorucak) + ' {content: "DORUČAK";}')
     if pravila:
         st.html("<style>" + "\n".join(pravila) + "</style>")
 
@@ -1249,13 +1197,7 @@ def stanje_soba_uzivo() -> None:
     dan = izabrani_dan()
     je_danas = dan == danas()
     zauzete = {int(r["soba"]): r for r in rezervacije_u_periodu(dan, dan)}
-    if je_telefon():
-        st.caption(
-            f"Sobe {'danas' if je_danas else fmt_d(dan)} · slobodno {BROJ_SOBA - len(zauzete)} od {BROJ_SOBA}"
-        )
-        kartice_soba(zauzete, dan)
-    else:
-        lista_soba(zauzete, dan)
+    lista_soba(zauzete, dan)
 
     c1, c2 = st.columns(2)
     with c1:
