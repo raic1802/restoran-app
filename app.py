@@ -1501,120 +1501,122 @@ def _prebaci_artikal(id_: int) -> None:
         odabrani.discard(id_)
 
 
-def _zatvori_narudzbinu() -> None:
-    st.session_state.pop("nab_rezultat", None)
-
-
-def prikazi_rezultat_narudzbine(rezultat: dict) -> None:
-    ime, telefon = rezultat.get("primalac", ""), rezultat.get("telefon", "")
-    st.success(
-        f"Spisak je spreman ({rezultat['broj']} art.)"
-        + (f" za: **{md(ime)}**. Pritisni WhatsApp i u otvorenom razgovoru samo pošalji." if ime else ".")
+def _poslano(ime: str, kanal: str) -> None:
+    """Dodir na Viber / SMS / WhatsApp: narudžba ide u istoriju, a izbor se čisti."""
+    priprema = st.session_state.get("nab_priprema") or {}
+    if not priprema.get("stavke"):
+        return
+    sacuvaj_narudzbinu(
+        ime_korisnika(), priprema["stavke"], priprema["napomena"], priprema["poruka"], sada(), f"{ime} · {kanal}"
     )
-    linkovi = linkovi_za_poruku(rezultat["poruka"], telefon)
-    with st.container(horizontal=True):
-        st.link_button(
-            f"WhatsApp – {ime}" if ime else "WhatsApp", linkovi["whatsapp"], type="primary",
-            width="stretch", icon=":material/send:",
-        )
-        st.link_button(f"SMS – {ime}" if ime else "SMS", linkovi["sms"], width="stretch")
-        st.link_button("Viber", linkovi["viber"], width="stretch")
-    st.caption("Viber ne dozvoljava direktan broj sa tekstom, pa tamo biraš kontakt sam.")
+    st.session_state["nab_odabrani"] = set()
+    st.session_state.pop("nab_priprema", None)
+    zakazi_reset("nab_napomena", "nab_pretraga")
+    poruka_uspjeha(
+        f"Spisak ({len(priprema['stavke'])} art.) poslat: {ime} · {kanal}. Sačuvan je u istoriji narudžbi."
+    )
 
-    ostali = [p for p in primaoci() if p["ime"] != ime]
-    if ostali:
-        with st.expander("Pošalji isti spisak i nekom drugom"):
-            with st.container(horizontal=True):
-                for p in ostali:
-                    st.link_button(
-                        f"WhatsApp – {p['ime']}",
-                        linkovi_za_poruku(rezultat["poruka"], p["telefon"])["whatsapp"],
-                        width="stretch",
-                    )
-    with st.expander("Tekst poruke (za kopiranje)"):
-        st.code(rezultat["poruka"], language=None, wrap_lines=True)
-    st.button("Gotovo", key="nab_gotovo", on_click=_zatvori_narudzbinu)
+
+def _kljuc_kategorije(kategorija: str) -> str:
+    return "nab_kat_" + hashlib.md5(kategorija.encode()).hexdigest()[:10]
 
 
 def stranica_nabavka() -> None:
     samo_admin()
     st.title("Nabavka")
-
-    rezultat = st.session_state.get("nab_rezultat")
-    if rezultat:
-        prikazi_rezultat_narudzbine(rezultat)
-        st.divider()
+    prikazi_poruku()
 
     artikli = svi_artikli()
     if artikli.empty:
-        st.info("Još nema artikala. Admin ih dodaje na stranici „Artikli“.")
+        st.info("Još nema artikala. Dodaj ih na stranici „Artikli“.")
         return
 
-    st.caption("Označi artikle koji fale, pa pritisni „Pošalji narudžbinu“ na dnu.")
+    st.caption("Otvori kategoriju i označi šta treba. Na dnu dodirni ime i izaberi Viber, SMS ili WhatsApp.")
     odabrani: set = st.session_state.setdefault("nab_odabrani", set())
     odabrani.intersection_update(set(artikli["id"].tolist()))
 
+    def kvadratic(red) -> None:
+        id_ = int(red.id)
+        kljuc = f"nab_cb_{id_}"
+        st.session_state[kljuc] = id_ in odabrani
+        st.checkbox(red.naziv, key=kljuc, on_change=_prebaci_artikal, args=(id_,))
+
     pretraga = st.text_input(
-        "Pretraga", key="nab_pretraga", placeholder="Traži artikal…", label_visibility="collapsed"
+        "Pretraga", key="nab_pretraga", placeholder="Traži artikal…", label_visibility="collapsed",
+        icon=":material/search:",
     )
-    prikaz = artikli
     if ocisti(pretraga):
+        # pretraga: odmah prikaži sve pogođene artikle, bez otvaranja kategorija
         prikaz = artikli[artikli["naziv"].str.contains(ocisti(pretraga), case=False, regex=False)]
         if prikaz.empty:
             st.caption("Nema artikala za tu pretragu.")
+        for kategorija, grupa in prikaz.groupby("kategorija", sort=False):
+            st.markdown(f"**{md(kategorija)}**")
+            for red in grupa.itertuples(index=False):
+                kvadratic(red)
+    else:
+        # kategorije kao spisak – dodir na kategoriju otvara njene artikle
+        for kategorija, grupa in artikli.groupby("kategorija", sort=False):
+            with st.expander(f"{kategorija} ({len(grupa)})", key=_kljuc_kategorije(kategorija)):
+                for red in grupa.itertuples(index=False):
+                    kvadratic(red)
 
-    for kategorija, grupa in prikaz.groupby("kategorija", sort=False):
-        st.subheader(kategorija)
-        for red in grupa.itertuples(index=False):
-            id_ = int(red.id)
-            kljuc = f"nab_cb_{id_}"
-            st.session_state[kljuc] = id_ in odabrani
-            st.checkbox(red.naziv, key=kljuc, on_change=_prebaci_artikal, args=(id_,))
-
-    st.divider()
     napomena = st.text_area(
-        "Napomena (količine, rok isporuke…)",
+        "Napomena (količine, rok…)",
         key="nab_napomena",
-        placeholder="npr. Coca-Cola 2 gajbe, isporuka do 10h",
+        placeholder="npr. Coca-Cola 2 gajbe",
         height=100,
     )
+
     izabrani = artikli[artikli["id"].isin(odabrani)]
-    if not izabrani.empty:
-        st.markdown(f"**Odabrano ({len(izabrani)}):** " + ", ".join(md(n) for n in izabrani["naziv"]))
+    stavke = [{"naziv": r.naziv, "kategorija": r.kategorija} for r in izabrani.itertuples(index=False)]
+    poruka = sastavi_poruku(stavke, napomena, ime_korisnika(), sada()) if stavke else ""
+    st.session_state["nab_priprema"] = {"stavke": stavke, "napomena": ocisti(napomena), "poruka": poruka}
+
+    st.subheader("Pošalji spisak")
+    if stavke:
+        st.markdown(f"**Označeno ({len(stavke)}):** " + ", ".join(md(s["naziv"]) for s in stavke))
+    else:
+        st.caption("Prvo označi artikle iznad.")
 
     lista = primaoci()
-    imena = [p["ime"] for p in lista]
-    if imena:
-        primalac = st.pills("Kome šalješ spisak?", imena, default=imena[0], key="nab_primalac")
-    else:
-        primalac = None
-        st.caption("Dodaj brojeve (npr. Tata, Mama) u „Podešavanjima“, pa se spisak šalje direktno njima.")
+    if not lista:
+        st.caption("Brojeve (Tata, Mama…) dodaješ u „Podešavanjima“. Do tada biraš kontakt sam.")
+        lista = [{"ime": "Izaberi kontakt", "telefon": ""}]
+    for i, p in enumerate(lista):
+        with st.popover(
+            p["ime"], icon=":material/person:", width="stretch", disabled=not stavke, key=f"nab_pop_{i}"
+        ):
+            linkovi = linkovi_za_poruku(poruka, p["telefon"])
+            if p["telefon"]:
+                st.caption(f"{p['ime']} · {p['telefon']}")
+            st.link_button(
+                "Viber", linkovi["viber"], type="primary", width="stretch", icon=":material/chat:",
+                on_click=_poslano, args=(p["ime"], "Viber"), key=f"nab_viber_{i}",
+            )
+            st.link_button(
+                "SMS", linkovi["sms"], width="stretch", icon=":material/sms:",
+                on_click=_poslano, args=(p["ime"], "SMS"), key=f"nab_sms_{i}",
+            )
+            st.link_button(
+                "WhatsApp", linkovi["whatsapp"], width="stretch", icon=":material/send:",
+                on_click=_poslano, args=(p["ime"], "WhatsApp"), key=f"nab_wa_{i}",
+            )
+            st.caption("Na Viberu tekst je već upisan – samo izaberi kontakt sa liste.")
 
-    if st.button(
-        "Pošalji narudžbinu", type="primary", width="stretch", disabled=izabrani.empty, key="nab_posalji",
-        icon=":material/send:",
-    ):
-        trenutak = sada()
-        stavke = [{"naziv": r.naziv, "kategorija": r.kategorija} for r in izabrani.itertuples(index=False)]
-        poruka = sastavi_poruku(stavke, napomena, ime_korisnika(), trenutak)
-        telefon = next((p["telefon"] for p in lista if p["ime"] == primalac), "")
-        sacuvaj_narudzbinu(ime_korisnika(), stavke, ocisti(napomena), poruka, trenutak, primalac or "")
-        st.session_state["nab_rezultat"] = {
-            "poruka": poruka, "broj": len(stavke), "primalac": primalac or "", "telefon": telefon,
-        }
-        st.session_state["nab_odabrani"] = set()
-        zakazi_reset("nab_napomena", "nab_pretraga")
-        st.rerun()
+    if poruka:
+        with st.expander("Tekst poruke"):
+            st.code(poruka, language=None, wrap_lines=True)
 
     posljednje = posljednje_narudzbine(5)
     if posljednje:
         with st.expander("Posljednje narudžbine"):
             for n in posljednje:
-                stavke = json.loads(n["stavke"] or "[]")
+                stavke_n = json.loads(n["stavke"] or "[]")
                 st.markdown(
                     f"**{fmt_dt(n['kreirano'])}** · {md(n['narucio'])}"
                     + (f" → {md(n['primalac'])}" if n.get("primalac") else "")
-                    + "  \n" + ", ".join(md(s["naziv"]) for s in stavke)
+                    + "  \n" + ", ".join(md(s["naziv"]) for s in stavke_n)
                 )
 
 
