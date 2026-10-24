@@ -233,14 +233,24 @@ def pripremi_url(url: str) -> tuple[str, dict]:
 
 
 @st.cache_resource(show_spinner=False)
-def baza():
-    url, parametri = pripremi_url(tajna("DATABASE_URL", "sqlite:///restoran.db"))
+def _motor(adresa: str):
+    url, parametri = pripremi_url(adresa)
     if url.startswith("sqlite"):
-        engine = create_engine(url, connect_args=parametri)
-    else:
-        engine = create_engine(url, connect_args=parametri, pool_pre_ping=True, pool_recycle=300)
-    _migriraj(engine)
-    return engine
+        return create_engine(url, connect_args=parametri)
+    return create_engine(url, connect_args=parametri, pool_pre_ping=True, pool_recycle=300)
+
+
+@st.cache_resource(show_spinner=False)
+def _sema_azurna(adresa: str, broj_migracija: int) -> bool:
+    """Primjenjuje nove migracije čim se u kodu pojavi nova (i bez restarta aplikacije)."""
+    _migriraj(_motor(adresa))
+    return True
+
+
+def baza():
+    adresa = tajna("DATABASE_URL", "sqlite:///restoran.db")
+    _sema_azurna(adresa, len(MIGRACIJE))
+    return _motor(adresa)
 
 
 def citanje(funkcija):
@@ -796,6 +806,10 @@ h1 {font-size: 1.75rem !important;}
 [class*="st-key-kartica_zauzeta_"] {background: rgba(220,38,38,.08) !important; border-color: rgba(220,38,38,.45) !important; border-radius: 14px !important;}
 [class*="st-key-kartica_slobodna_"] {background: rgba(22,163,74,.08) !important; border-color: rgba(22,163,74,.45) !important; border-radius: 14px !important;}
 [class*="st-key-kartica_"] [data-testid="stButton"] button {min-height: 2.5rem;}
+[class*="st-key-kartica_"] {cursor: pointer; transition: transform .08s ease;}
+[class*="st-key-kartica_"]:active {transform: scale(.97);}
+.kartice-dodir [class*="st-key-kartica_"] [data-testid="stButton"] {display: none !important;}
+.st-key-brza_dugmad {position: sticky; top: 3.75rem; z-index: 50; padding: .5rem; margin: 0 -.5rem; border-radius: 16px; background: rgba(127,127,127,.12); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);}.kartice-dodir [class*="st-key-kartica_"] .stElementContainer:has([data-testid="stButton"]) {display: none !important;}
 .kartica .br {font-size: 1.1rem; font-weight: 700;}
 .kartica .status {display: inline-block; margin-top: .35rem; padding: .2rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 700; letter-spacing: .05em; color: #fff;}
 .kartica .status.s {background: #15803d;}
@@ -861,6 +875,22 @@ def ubaci_skriptu() -> None:
         kolacic('', 0);
       }
     }
+  } catch (e) {}
+
+  // ── dodir na karticu sobe otvara prozor (pritiska skriveno dugme u kartici) ──
+  try {
+    if (!window.__karticeDodir) {
+      window.__karticeDodir = true;
+      document.addEventListener('click', function (e) {
+        var cilj = e.target;
+        if (!cilj || !cilj.closest) return;
+        var kartica = cilj.closest('[class*="st-key-kartica_"]');
+        if (!kartica || cilj.closest('button')) return;
+        var dugme = kartica.querySelector('[data-testid="stButton"] button');
+        if (dugme) { dugme.click(); }
+      });
+    }
+    document.documentElement.classList.add('kartice-dodir');
   } catch (e) {}
 
   // ── ikonica na početnom ekranu ──
@@ -959,7 +989,11 @@ def ko_je_upisao_html(r: dict) -> str:
 
 
 def kartica_sobe(s: int, r: dict | None) -> None:
-    """Jedna soba: zauzeta (crveno, dugme Otvori) ili slobodna (zeleno, dugme Rezerviši)."""
+    """Jedna soba: zauzeta (crveno) ili slobodna (zeleno).
+
+    Dodir bilo gdje na karticu pritiska njeno dugme (skripta u ubaci_skriptu), a samo
+    dugme se tada sakrije. Ako skripta ne radi, dugme ostaje vidljivo kao rezerva.
+    """
     if r:
         with st.container(border=True, key=f"kartica_zauzeta_{s}"):
             st.markdown(
@@ -1026,23 +1060,25 @@ def kalendar_uzivo() -> None:
     kalendar_soba()
 
 
-def stranica_pocetna() -> None:
-    zapamti_uredjaj()
-    st.title(dugi_datum(danas()))
-    prikazi_poruku()
-    stanje_soba_uzivo()
-
-    st.subheader("Kalendar soba")
-    kalendar_uzivo()
-
-    st.divider()
-    with st.container(horizontal=True):
+def brza_dugmad() -> None:
+    """Glavna dugmad na vrhu Početne – ostaju vidljiva i dok se lista sobe (CSS sticky)."""
+    with st.container(horizontal=True, key="brza_dugmad"):
         if st.button("Kraj smjene", icon=":material/point_of_sale:", width="stretch", key="brzo_smjena"):
             st.switch_page(STRANICE["smjena"])
         if st.button("Nabavka", icon=":material/shopping_cart:", width="stretch", key="brzo_nabavka"):
             st.switch_page(STRANICE["nabavka"])
         if st.button("Nova rezervacija", icon=":material/hotel:", width="stretch", key="brzo_rezervacija"):
             st.switch_page(STRANICE["smjestaj"])
+        if st.button("Kalendar", icon=":material/calendar_month:", width="stretch", key="brzo_kalendar"):
+            st.switch_page(STRANICE["kalendar"])
+
+
+def stranica_pocetna() -> None:
+    zapamti_uredjaj()
+    st.title(dugi_datum(danas()))
+    brza_dugmad()
+    prikazi_poruku()
+    stanje_soba_uzivo()
 
     with st.expander("Ikonica na telefonu", icon=":material/smartphone:"):
         st.markdown(
@@ -1173,21 +1209,12 @@ def dijalog_rezervacije(rid: int) -> None:
 
     ci, co = u_datum(r["check_in"]), u_datum(r["check_out"])
     st.markdown(f"### Soba {r['soba']} · {md(r['gost'])}")
-    st.markdown(
-        f"{fmt_d(ci)} → {fmt_d(co)} · {noci_tekst((co - ci).days)}  \n"
-        f"**{cijena_tekst(r['cijena'])}** · {r['izvor']}"
-    )
-    if r["napomena"]:
-        st.markdown(f"Napomena: _{md(r['napomena'])}_")
-    st.caption(f"Upisao: {r['upisao']} · {fmt_dt(r['kreirano'])}")
-    for i in izmjene_rezervacije(rid):
-        st.caption(f"Uredio: {i['ko']} · {fmt_dt(i['kreirano'])} — {i['opis']}")
-    st.divider()
 
     mod = st.session_state.get("dijalog_mod", "pregled")
     if mod == "uredi":
         forma_izmjene_rezervacije(r)
-    elif mod == "otkazi" and je_admin():
+        return
+    if mod == "otkazi" and je_admin():
         st.warning(f"Otkazati rezervaciju: Soba {r['soba']} · {r['gost']}?")
         c1, c2 = st.columns(2, wrap=False)
         if c1.button("Da, otkaži", type="primary", width="stretch", key="dlg_otkazi_da"):
@@ -1198,20 +1225,29 @@ def dijalog_rezervacije(rid: int) -> None:
         if c2.button("Ne", width="stretch", key="dlg_otkazi_ne"):
             _postavi_mod("pregled")
             st.rerun(scope="fragment")
-    else:
-        with st.container(horizontal=True):
+        return
+
+    # Glavne opcije odmah na vrhu: admin → Uredi + Otkaži, radnik → samo Uredi
+    with st.container(horizontal=True):
+        st.button(
+            "Uredi", icon=":material/edit:", type="primary", width="stretch",
+            on_click=_postavi_mod, args=("uredi",), key="dlg_uredi",
+        )
+        if je_admin():
             st.button(
-                "Uredi", icon=":material/edit:", type="primary", width="stretch",
-                on_click=_postavi_mod, args=("uredi",), key="dlg_uredi",
+                "Otkaži", icon=":material/event_busy:", width="stretch",
+                on_click=_postavi_mod, args=("otkazi",), key="dlg_otkazi",
             )
-            if je_admin():
-                st.button(
-                    "Otkaži rezervaciju", icon=":material/event_busy:", width="stretch",
-                    on_click=_postavi_mod, args=("otkazi",), key="dlg_otkazi",
-                )
-            if st.button("Zatvori", width="stretch", key="dlg_zatvori"):
-                _zatvori_dijalog()
-                st.rerun()
+
+    st.markdown(
+        f"{fmt_d(ci)} → {fmt_d(co)} · {noci_tekst((co - ci).days)}  \n"
+        f"**{cijena_tekst(r['cijena'])}** · {r['izvor']}"
+    )
+    if r["napomena"]:
+        st.markdown(f"Napomena: _{md(r['napomena'])}_")
+    st.caption(f"Upisao: {r['upisao']} · {fmt_dt(r['kreirano'])}")
+    for i in izmjene_rezervacije(rid):
+        st.caption(f"Uredio: {i['ko']} · {fmt_dt(i['kreirano'])} — {i['opis']}")
 
 
 @st.dialog("Nova rezervacija", width="medium", on_dismiss=_zatvori_dijalog)
@@ -1677,13 +1713,16 @@ def lista_rezervacija() -> None:
 def stranica_smjestaj() -> None:
     st.title("Smještaj")
     prikazi_poruku()
-    tab_nova, tab_kalendar, tab_lista = st.tabs(["Nova rezervacija", "Kalendar", "Rezervacije"])
+    tab_nova, tab_lista = st.tabs(["Nova rezervacija", "Rezervacije"])
     with tab_nova:
         forma_rezervacije()
-    with tab_kalendar:
-        kalendar_uzivo()
     with tab_lista:
         lista_rezervacija()
+
+
+def stranica_kalendar() -> None:
+    st.title("Kalendar soba")
+    kalendar_uzivo()
 
 
 # ── Admin: izvještaji ────────────────────────────────────────────────────────
@@ -2126,6 +2165,9 @@ def main() -> None:
             ),
             "smjestaj": st.Page(
                 stranica_smjestaj, title="Smještaj", icon=":material/hotel:", url_path="smjestaj"
+            ),
+            "kalendar": st.Page(
+                stranica_kalendar, title="Kalendar", icon=":material/calendar_month:", url_path="kalendar"
             ),
         }
     )
