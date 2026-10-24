@@ -901,6 +901,21 @@ h1 {font-size: 1.75rem !important;}
 .kartica .placanje.ne {background: #f59e0b;}
 .kartica .dorucak {position: absolute; right: 0; bottom: .05rem; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .95rem; line-height: 1; background: #fff7e6; box-shadow: 0 1px 3px rgba(0,0,0,.25);}
 .kartica .cijena {padding-right: 1.7rem;}
+/* računar: sobe kao dnevni pregled Google Kalendara (iste boje) */
+.st-key-sobe_lista {background: #131314; border-radius: 24px; padding: 1rem 1.25rem 1.25rem; gap: 4px !important; margin-bottom: .75rem;}
+.gk-glava {display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem .1rem;}
+.gk-dan {display: flex; flex-direction: column; align-items: center; gap: .15rem;}
+.gk-ned {color: #aec6f6; font-size: .72rem; font-weight: 600; letter-spacing: .06em;}
+.gk-broj {width: 2.9rem; height: 2.9rem; border-radius: 50%; background: #aec6f6; color: #132d6b; display: flex; align-items: center; justify-content: center; font-size: 1.45rem; font-weight: 500;}
+.gk-slobodno {color: #c4c7c5; font-size: .9rem;}
+.st-key-sobe_lista [data-testid="stButton"] button {min-height: 2.4rem; padding: 0 .9rem; border-radius: 6px; justify-content: flex-start; text-align: left; box-shadow: none;}
+.st-key-sobe_lista [data-testid="stButton"] button > div {justify-content: flex-start; width: 100%;}
+.st-key-sobe_lista [data-testid="stButton"] button p {font-size: .95rem; font-weight: 500;}
+.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button {background: #5b8f64; border: none; color: #131314;}
+.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button:hover {background: #66a070; color: #131314;}
+.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {margin-left: auto; padding-left: 1rem; font-size: .95rem; white-space: nowrap;}
+.st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button {background: transparent; border: 1px solid #333537; color: #9aa0a6;}
+.st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button:hover {background: #1e1f20; border-color: #5b8f64; color: #c4c7c5;}
 .kal-okvir {overflow-x: auto; margin: .25rem 0 1rem;}
 table.kal {width: 100%; min-width: 320px; border-collapse: separate !important; border-spacing: 3px; table-layout: fixed; font-size: .8rem; border: none !important; margin: 0;}
 table.kal tr {background: transparent !important;}
@@ -1166,16 +1181,50 @@ def kartice_soba(zauzete: dict[int, dict], dan: date) -> None:
                     kartica_sobe(s, zauzete.get(s), dan)
 
 
+def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
+    """Računar: sobe jedna ispod druge, kao dnevni pregled u Google Kalendaru.
+
+    Traka prikazuje broj sobe i cijenu; sve ostalo se vidi dodirom (prozor sobe).
+    Oznake plaćanja i doručka idu na desni kraj trake (CSS ::after, bez JavaScripta).
+    """
+    slobodno = BROJ_SOBA - len(zauzete)
+    oznake = []
+    with st.container(key="sobe_lista", gap="xxsmall"):
+        st.markdown(
+            f'<div class="gk-glava"><div class="gk-dan"><span class="gk-ned">{DANI_KRATKO[dan.weekday()].upper()}</span>'
+            f'<span class="gk-broj">{dan.day}</span></div>'
+            f'<span class="gk-slobodno">slobodno {slobodno} od {BROJ_SOBA}</span></div>',
+            unsafe_allow_html=True,
+        )
+        for s in SOBE:
+            r = zauzete.get(s)
+            if r:
+                ikone = ("🍳  " if ima_dorucak(r) else "") + ("✅" if int(r.get("placeno") or 0) else "🟡")
+                oznake.append(f'.st-key-otvori_sobu_{s} button::after {{content: "{ikone}";}}')
+                if st.button(
+                    f"**Soba {s}**  ·  {cijena_tekst(r['cijena'])}", key=f"otvori_sobu_{s}", width="stretch"
+                ):
+                    otvori_dijalog({"tip": "rezervacija", "id": int(r["id"])})
+            else:
+                if st.button(f"**Soba {s}**  ·  slobodna", key=f"rezervisi_sobu_{s}", width="stretch"):
+                    otvori_dijalog({"tip": "nova", "soba": s, "dan": dan.isoformat()})
+    if oznake:
+        st.html("<style>" + "\n".join(oznake) + "</style>")
+
+
 @st.fragment(run_every=OSVJEZAVANJE_SEKUNDI)
 def stanje_soba_uzivo() -> None:
     """Sobe, dolasci i odlasci za izabrani dan – samo se osvježava na svim uređajima."""
     dan = izabrani_dan()
     je_danas = dan == danas()
     zauzete = {int(r["soba"]): r for r in rezervacije_u_periodu(dan, dan)}
-    st.caption(
-        f"Sobe {'danas' if je_danas else fmt_d(dan)} · slobodno {BROJ_SOBA - len(zauzete)} od {BROJ_SOBA}"
-    )
-    kartice_soba(zauzete, dan)
+    if je_telefon():
+        st.caption(
+            f"Sobe {'danas' if je_danas else fmt_d(dan)} · slobodno {BROJ_SOBA - len(zauzete)} od {BROJ_SOBA}"
+        )
+        kartice_soba(zauzete, dan)
+    else:
+        lista_soba(zauzete, dan)
 
     c1, c2 = st.columns(2)
     with c1:
