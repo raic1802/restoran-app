@@ -57,6 +57,7 @@ KAFANA = "Kafana i smještaj"
 KUHINJA = "Kuhinja"
 ODJELJENJA = [KAFANA, KUHINJA]
 IZVORI = ["Privatno", "Booking"]
+PLACANJE = ["Nije plaćeno", "Plaćeno"]  # indeks = vrijednost kolone placeno (0 / 1)
 
 # Koliko često se sobe i kalendar sami osvježavaju na svim uređajima (u sekundama)
 OSVJEZAVANJE_SEKUNDI = 20
@@ -185,7 +186,11 @@ MIGRACIJE: list[list[str]] = [
         )""",
         "CREATE INDEX IF NOT EXISTS ix_izmjene_rezervacija ON izmjene_rezervacija (rezervacija_id)",
     ],
-    # ── verzija 3: ovdje dodaj buduće izmjene, npr. ─────────────────────────
+    # ── verzija 3: plaćeno / nije plaćeno ────────────────────────────────────
+    [
+        "ALTER TABLE rezervacije ADD COLUMN placeno INTEGER NOT NULL DEFAULT 0",
+    ],
+    # ── verzija 4: ovdje dodaj buduće izmjene, npr. ─────────────────────────
     # ["ALTER TABLE artikli ADD COLUMN jedinica TEXT NOT NULL DEFAULT ''"],
 ]
 
@@ -429,13 +434,30 @@ def izmijeni_rezervaciju(id_: int, zapis: dict, ko: str, opis: str) -> None:
 
 
 def sacuvaj_rezervaciju(zapis: dict) -> None:
+    zapis = {"placeno": 0, **zapis}
     izvrsi(
         """INSERT INTO rezervacije (gost, soba, cijena, izvor, check_in, check_out,
-               napomena, upisao, kreirano)
+               napomena, upisao, kreirano, placeno)
            VALUES (:gost, :soba, :cijena, :izvor, :check_in, :check_out,
-               :napomena, :upisao, :kreirano)""",
+               :napomena, :upisao, :kreirano, :placeno)""",
         **zapis,
     )
+
+
+def postavi_placeno(id_: int, placeno: bool, ko: str) -> bool:
+    """Mijenja plaćeno / nije plaćeno i bilježi ko je i kada to promijenio."""
+    r = rezervacija_po_id(id_)
+    if not r or int(r["placeno"]) == int(placeno):
+        return False
+    trenutak = sada()
+    izvrsi(
+        "UPDATE rezervacije SET placeno = :p, uredio = :ko, uredjeno = :t WHERE id = :id",
+        p=int(placeno), ko=ko, t=trenutak.isoformat(sep=" "), id=int(id_),
+    )
+    zabiljezi_izmjenu(
+        id_, ko, f"plaćanje: {PLACANJE[int(r['placeno'])]} → {PLACANJE[int(placeno)]}", trenutak
+    )
+    return True
 
 
 @citanje
@@ -810,7 +832,13 @@ h1 {font-size: 1.75rem !important;}
 [class*="st-key-kartica_"]:active {transform: scale(.97);}
 .kartice-dodir [class*="st-key-kartica_"] [data-testid="stButton"] {display: none !important;}
 .st-key-brza_dugmad {position: sticky; top: 3.75rem; z-index: 50; padding: .5rem; margin: 0 -.5rem; border-radius: 16px; background: rgba(127,127,127,.12); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);}.kartice-dodir [class*="st-key-kartica_"] .stElementContainer:has([data-testid="stButton"]) {display: none !important;}
+.kartica {position: relative;}
 .kartica .br {font-size: 1.1rem; font-weight: 700;}
+.kartica .placanje {position: absolute; top: -.15rem; right: -.15rem; width: 1.75rem; height: 1.75rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .95rem; font-weight: 800; color: #fff; line-height: 1;}
+.kartica .placanje.da {background: #16a34a;}
+.kartica .placanje.ne {background: #f59e0b;}
+.datum-naslov {font-size: 1.35rem; font-weight: 700; line-height: 1.3; text-align: center; margin: 0;}
+.datum-naslov .nije-danas {display: block; font-size: .8rem; font-weight: 600; opacity: .6;}
 .kartica .status {display: inline-block; margin-top: .35rem; padding: .2rem .6rem; border-radius: 999px; font-size: .75rem; font-weight: 700; letter-spacing: .05em; color: #fff;}
 .kartica .status.s {background: #15803d;}
 .kartica .status.z {background: #dc2626;}
@@ -988,7 +1016,7 @@ def ko_je_upisao_html(r: dict) -> str:
     return tekst
 
 
-def kartica_sobe(s: int, r: dict | None) -> None:
+def kartica_sobe(s: int, r: dict | None, dan: date) -> None:
     """Jedna soba: zauzeta (crveno) ili slobodna (zeleno).
 
     Dodir bilo gdje na karticu pritiska njeno dugme (skripta u ubaci_skriptu), a samo
@@ -996,8 +1024,14 @@ def kartica_sobe(s: int, r: dict | None) -> None:
     """
     if r:
         with st.container(border=True, key=f"kartica_zauzeta_{s}"):
+            placeno = int(r.get("placeno") or 0)
+            znacka = (
+                '<span class="placanje da" title="Plaćeno">✓</span>'
+                if placeno
+                else '<span class="placanje ne" title="Čeka plaćanje">€</span>'
+            )
             st.markdown(
-                f'<div class="kartica"><div class="br">Soba {s}</div>'
+                f'<div class="kartica">{znacka}<div class="br">Soba {s}</div>'
                 f'<span class="status z">ZAUZETA</span>'
                 f'<div class="gost">{esc(r["gost"])}<br>do {fmt_dk(r["check_out"])}</div>'
                 f'<div class="cijena">{cijena_tekst(r["cijena"])}</div>'
@@ -1014,40 +1048,44 @@ def kartica_sobe(s: int, r: dict | None) -> None:
                 unsafe_allow_html=True,
             )
             if st.button("Rezerviši", key=f"rezervisi_sobu_{s}", icon=":material/add:", width="stretch"):
-                otvori_dijalog({"tip": "nova", "soba": s})
+                otvori_dijalog({"tip": "nova", "soba": s, "dan": dan.isoformat()})
 
 
-def kartice_soba(zauzete: dict[int, dict]) -> None:
+def kartice_soba(zauzete: dict[int, dict], dan: date) -> None:
     with st.container(key="sobe_mreza"):
         for pocetak in range(0, len(SOBE), 4):
             kolone = st.columns(4)
             for kolona, s in zip(kolone, SOBE[pocetak:pocetak + 4]):
                 with kolona:
-                    kartica_sobe(s, zauzete.get(s))
+                    kartica_sobe(s, zauzete.get(s), dan)
 
 
 @st.fragment(run_every=OSVJEZAVANJE_SEKUNDI)
 def stanje_soba_uzivo() -> None:
-    """Sobe danas, dolasci i odlasci – samo se osvježava na svim uređajima."""
-    dan = danas()
+    """Sobe, dolasci i odlasci za izabrani dan – samo se osvježava na svim uređajima."""
+    dan = izabrani_dan()
+    je_danas = dan == danas()
     zauzete = {int(r["soba"]): r for r in rezervacije_u_periodu(dan, dan)}
-    st.caption(f"Sobe danas · slobodno {BROJ_SOBA - len(zauzete)} od {BROJ_SOBA}")
-    kartice_soba(zauzete)
+    st.caption(
+        f"Sobe {'danas' if je_danas else fmt_d(dan)} · slobodno {BROJ_SOBA - len(zauzete)} od {BROJ_SOBA}"
+    )
+    kartice_soba(zauzete, dan)
 
     c1, c2 = st.columns(2)
     with c1:
-        st.subheader("Dolasci danas")
+        st.subheader("Dolasci danas" if je_danas else "Dolasci")
         dolasci = dolasci_na_dan(dan)
         if not dolasci:
             st.caption("Nema dolazaka.")
         for r in dolasci:
             st.markdown(
-                f"**Soba {r['soba']}** · {md(r['gost'])} · do {fmt_dk(r['check_out'])} · {r['izvor']}"
+                f"**Soba {r['soba']}** · {md(r['gost'])} · do {fmt_dk(r['check_out'])} · {r['izvor']} · "
+                f"{'Plaćeno ✓' if int(r.get('placeno') or 0) else 'Nije plaćeno'}"
                 + (f"  \n_{md(r['napomena'])}_" if r["napomena"] else "")
             )
             st.caption(f"upisao {r['upisao']} · {fmt_dtk(r['kreirano'])}")
     with c2:
-        st.subheader("Odlasci danas")
+        st.subheader("Odlasci danas" if je_danas else "Odlasci")
         odlasci = odlasci_na_dan(dan)
         if not odlasci:
             st.caption("Nema odlazaka.")
@@ -1073,9 +1111,34 @@ def brza_dugmad() -> None:
             st.switch_page(STRANICE["kalendar"])
 
 
+def izabrani_dan() -> date:
+    """Dan prikazan na Početnoj (pomak od danas, pa se poslije ponoći sam pomjeri)."""
+    return danas() + timedelta(days=int(st.session_state.get("pocetna_pomak", 0)))
+
+
+def _pomjeri_dan(n: int) -> None:
+    st.session_state["pocetna_pomak"] = int(st.session_state.get("pocetna_pomak", 0)) + n
+
+
+def _vrati_na_danas() -> None:
+    st.session_state["pocetna_pomak"] = 0
+
+
+def red_sa_datumom() -> None:
+    """◀  Subota, 24. oktobra 2026.  ▶  – listanje dana naprijed i nazad."""
+    dan = izabrani_dan()
+    with st.container(horizontal=True, wrap=False, vertical_alignment="center", key="pocetna_datum"):
+        st.button("◀", key="dan_nazad", on_click=_pomjeri_dan, args=(-1,), help="Prethodni dan")
+        oznaka = "" if dan == danas() else '<span class="nije-danas">nije danas</span>'
+        st.markdown(f'<p class="datum-naslov">{esc(dugi_datum(dan))}{oznaka}</p>', unsafe_allow_html=True)
+        st.button("▶", key="dan_naprijed", on_click=_pomjeri_dan, args=(1,), help="Sljedeći dan")
+    if dan != danas():
+        st.button("Vrati na danas", key="dan_danas", on_click=_vrati_na_danas, icon=":material/today:")
+
+
 def stranica_pocetna() -> None:
     zapamti_uredjaj()
-    st.title(dugi_datum(danas()))
+    red_sa_datumom()
     brza_dugmad()
     prikazi_poruku()
     stanje_soba_uzivo()
@@ -1107,11 +1170,24 @@ def otvori_dijalog(podaci: dict) -> None:
 def _zatvori_dijalog() -> None:
     st.session_state.pop("dijalog", None)
     st.session_state.pop("dijalog_mod", None)
-    zakazi_reset("urf_", "rezd_")
+    zakazi_reset("urf_", "rezd_", "plac_")
 
 
 def _postavi_mod(mod: str) -> None:
     st.session_state["dijalog_mod"] = mod
+
+
+def _promijeni_placanje(rid: int) -> None:
+    kljuc = f"plac_{rid}"
+    izbor = st.session_state.get(kljuc)
+    r = rezervacija_po_id(rid)
+    if not r:
+        return
+    if izbor is None:  # dodir na već izabrano dugme ga odznači – vrati trenutno stanje
+        st.session_state[kljuc] = PLACANJE[int(r.get("placeno") or 0)]
+        return
+    if postavi_placeno(rid, izbor == PLACANJE[1], ime_korisnika()):
+        poruka_uspjeha(f"Soba {r['soba']} · {r['gost']}: {izbor.lower()} (upisao {ime_korisnika()}, {fmt_dt(sada())})")
 
 
 def opis_izmjena(staro: dict, novo: dict) -> list[str]:
@@ -1227,6 +1303,13 @@ def dijalog_rezervacije(rid: int) -> None:
             st.rerun(scope="fragment")
         return
 
+    # Plaćeno / nije plaćeno – mogu i radnik i admin; promjena se odmah upisuje sa imenom i vremenom
+    st.segmented_control(
+        "Plaćanje", PLACANJE, default=PLACANJE[int(r.get("placeno") or 0)],
+        format_func=lambda o: "✓ Plaćeno" if o == PLACANJE[1] else "Nije plaćeno",
+        key=f"plac_{rid}", on_change=_promijeni_placanje, args=(rid,), width="stretch",
+    )
+
     # Glavne opcije odmah na vrhu: admin → Uredi + Otkaži, radnik → samo Uredi
     with st.container(horizontal=True):
         st.button(
@@ -1251,9 +1334,9 @@ def dijalog_rezervacije(rid: int) -> None:
 
 
 @st.dialog("Nova rezervacija", width="medium", on_dismiss=_zatvori_dijalog)
-def dijalog_nove_rezervacije(soba: int) -> None:
+def dijalog_nove_rezervacije(soba: int, dan: date) -> None:
     st.markdown(f"### Soba {soba}")
-    forma_rezervacije(prefiks="rezd_", fiksna_soba=soba)
+    forma_rezervacije(prefiks="rezd_", fiksna_soba=soba, pocetni_dan=dan)
 
 
 def prikazi_dijalog() -> None:
@@ -1263,7 +1346,7 @@ def prikazi_dijalog() -> None:
     if podaci.get("tip") == "rezervacija":
         dijalog_rezervacije(int(podaci["id"]))
     elif podaci.get("tip") == "nova":
-        dijalog_nove_rezervacije(int(podaci["soba"]))
+        dijalog_nove_rezervacije(int(podaci["soba"]), u_datum(podaci.get("dan") or danas()))
 
 
 # ── Kraj smjene: pazar i rashodi ─────────────────────────────────────────────
@@ -1464,9 +1547,12 @@ def stranica_nabavka() -> None:
 
 # ── Smještaj: rezervacije, kalendar, istorija ────────────────────────────────
 
-def forma_rezervacije(prefiks: str = "rezf_", fiksna_soba: int | None = None) -> None:
-    """Nova rezervacija. U prozoru sa Početne soba je već izabrana (fiksna_soba)."""
+def forma_rezervacije(
+    prefiks: str = "rezf_", fiksna_soba: int | None = None, pocetni_dan: date | None = None
+) -> None:
+    """Nova rezervacija. U prozoru sa Početne soba (i dan) su već izabrani."""
     p = prefiks
+    pocetak = pocetni_dan or danas()
     with st.form(f"forma_rezervacija_{p}", border=fiksna_soba is None):
         gost = st.text_input("Ime i prezime gosta", key=p + "gost")
         if fiksna_soba is None:
@@ -1475,11 +1561,14 @@ def forma_rezervacije(prefiks: str = "rezf_", fiksna_soba: int | None = None) ->
             soba = fiksna_soba
         izvor = st.segmented_control("Izvor rezervacije", IZVORI, key=p + "izvor", width="stretch")
         c1, c2 = st.columns(2, wrap=False)
-        check_in = c1.date_input("Check-in", value=danas(), format="DD.MM.YYYY", key=p + "in")
+        check_in = c1.date_input("Check-in", value=pocetak, format="DD.MM.YYYY", key=p + "in")
         check_out = c2.date_input(
-            "Check-out", value=danas() + timedelta(days=1), format="DD.MM.YYYY", key=p + "out"
+            "Check-out", value=pocetak + timedelta(days=1), format="DD.MM.YYYY", key=p + "out"
         )
         cijena = iznos("Cijena rezervacije (€) – upiši 0 za „cijena na upit“", p + "cijena")
+        placanje = st.segmented_control(
+            "Plaćanje", PLACANJE, default=PLACANJE[0], key=p + "placanje", width="stretch"
+        )
         napomena = st.text_area(
             "Napomena", key=p + "napomena", placeholder="npr. Potreban dječiji krevetac u sobi", height=100
         )
@@ -1523,6 +1612,7 @@ def forma_rezervacije(prefiks: str = "rezf_", fiksna_soba: int | None = None) ->
             "napomena": ocisti(napomena),
             "upisao": ime_korisnika(),
             "kreirano": trenutak.isoformat(sep=" "),
+            "placeno": 1 if placanje == PLACANJE[1] else 0,
         }
     )
     noci = (check_out - check_in).days
@@ -1531,7 +1621,7 @@ def forma_rezervacije(prefiks: str = "rezf_", fiksna_soba: int | None = None) ->
         f"({noci_tekst(noci)}) · upisao {ime_korisnika()}, {fmt_dt(trenutak)}"
     )
     _zatvori_dijalog()
-    zakazi_reset("urf_", "rezd_", p)
+    zakazi_reset("urf_", "rezd_", "plac_", p)
     st.rerun()
 
 
@@ -1645,7 +1735,8 @@ def lista_rezervacija() -> None:
                 st.markdown(f"**Soba {r.soba} · {md(r.gost)}**")
                 st.markdown(
                     f"{fmt_d(r.ci)} → {fmt_d(r.co)} · {noci_tekst((r.co - r.ci).days)} · "
-                    f"{r.izvor} · {cijena_tekst(r.cijena)}"
+                    f"{r.izvor} · {cijena_tekst(r.cijena)} · "
+                    f"{'Plaćeno ✓' if int(r.placeno or 0) else 'Nije plaćeno'}"
                 )
                 if r.napomena:
                     st.markdown(f"Napomena: _{md(r.napomena)}_")
@@ -1665,6 +1756,7 @@ def lista_rezervacija() -> None:
                 "Check-out": prikaz["co"].map(fmt_d),
                 "Noći": [(co - ci).days for ci, co in zip(prikaz["ci"], prikaz["co"])],
                 "Cijena": prikaz["cijena"].map(cijena_tekst),
+                "Plaćanje": [PLACANJE[int(p or 0)] for p in prikaz["placeno"]],
                 "Izvor": prikaz["izvor"],
                 "Napomena": prikaz["napomena"],
                 "Upisao": prikaz["upisao"],
