@@ -887,33 +887,38 @@ h1 {font-size: 1.75rem !important;}
 .kartice-dodir [class*="st-key-kartica_"] [data-testid="stButton"] {display: none !important;}
 .kartice-dodir [class*="st-key-kartica_"] .stElementContainer:has([data-testid="stButton"]) {display: none !important;}
 .kartica {position: relative; height: 5rem; overflow: hidden;}
-.kartica .glava {display: flex; align-items: center; gap: .4rem; font-size: 1rem; line-height: 1.5rem; padding-right: 1.6rem; white-space: nowrap;}
+.kartica .glava {display: flex; align-items: center; gap: .4rem; font-size: 1rem; line-height: 1.5rem; white-space: nowrap;}
 .kartica .status {display: inline-block; padding: .08rem .4rem; border-radius: 999px; font-size: .58rem; font-weight: 700; letter-spacing: .04em; color: #fff; line-height: 1.2;}
 .kartica .status.s {background: #15803d;}
 .kartica .status.z {background: #dc2626;}
-.kartica .gost, .kartica .info, .kartica .cijena {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.kartica .gost, .kartica .lijevo {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.kartica .red {display: flex; align-items: center; justify-content: space-between; gap: .3rem;}
+.kartica .lijevo {min-width: 0; flex: 1 1 auto;}
 .kartica .gost {font-size: .88rem; font-weight: 600; line-height: 1.25rem;}
 .kartica .info {font-size: .74rem; line-height: 1.05rem; opacity: .75;}
 .kartica .cijena {font-size: .8rem; font-weight: 700; line-height: 1.15rem;}
 .kartica .prazno {margin-top: .35rem; white-space: normal;}
-.kartica .placanje {position: absolute; top: .05rem; right: 0; width: 1.35rem; height: 1.35rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 800; color: #fff; line-height: 1;}
-.kartica .placanje.da {background: #16a34a;}
-.kartica .placanje.ne {background: #f59e0b;}
-.kartica .dorucak {position: absolute; right: 0; bottom: .05rem; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .95rem; line-height: 1; background: #fff7e6; box-shadow: 0 1px 3px rgba(0,0,0,.25);}
-.kartica .cijena {padding-right: 1.7rem;}
+.kartica .pl {flex: none; padding: .08rem .38rem; border-radius: 999px; font-size: .55rem; font-weight: 800; letter-spacing: .03em; line-height: 1.25;}
+.kartica .pl.da {background: #16a34a; color: #fff;}
+.kartica .pl.ne {background: #fbbf24; color: #1f1f1f;}
+.kartica .dor {flex: none; display: inline-flex; align-items: center; gap: .2rem; font-size: .66rem; font-weight: 700; opacity: 1;}
+.ik-pribor {display: inline-block; width: .8rem; height: .8rem; background-color: currentColor; -webkit-mask: var(--pribor) center / contain no-repeat; mask: var(--pribor) center / contain no-repeat;}
 /* računar: sobe kao dnevni pregled Google Kalendara (iste boje) */
 .st-key-sobe_lista {background: #131314; border-radius: 24px; padding: 1rem 1.25rem 1.25rem; gap: 4px !important; margin-bottom: .75rem;}
-.gk-glava {display: flex; align-items: center; gap: 1rem; margin: 0 0 .5rem .1rem;}
-.gk-dan {display: flex; flex-direction: column; align-items: center; gap: .15rem;}
-.gk-ned {color: #aec6f6; font-size: .72rem; font-weight: 600; letter-spacing: .06em;}
-.gk-broj {width: 2.9rem; height: 2.9rem; border-radius: 50%; background: #aec6f6; color: #132d6b; display: flex; align-items: center; justify-content: center; font-size: 1.45rem; font-weight: 500;}
-.gk-slobodno {color: #c4c7c5; font-size: .9rem;}
+.gk-glava {display: flex; align-items: center; gap: .85rem; height: 3rem; padding: 0 0 .7rem .15rem; margin-bottom: .45rem; border-bottom: 1px solid #333537; box-sizing: content-box;}
+.gk-broj {flex: none; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: #aec6f6; color: #132d6b; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; font-weight: 600; line-height: 1;}
+.gk-tekst {display: flex; flex-direction: column; justify-content: center; gap: .15rem; line-height: 1.2;}
+.gk-ned {color: #aec6f6; font-size: .78rem; font-weight: 700; letter-spacing: .08em;}
+.gk-slobodno {color: #c4c7c5; font-size: .85rem;}
 .st-key-sobe_lista [data-testid="stButton"] button {min-height: 2.4rem; padding: 0 .9rem; border-radius: 6px; justify-content: flex-start; text-align: left; box-shadow: none;}
-.st-key-sobe_lista [data-testid="stButton"] button > div {justify-content: flex-start; width: 100%;}
+.st-key-sobe_lista [data-testid="stButton"] button > div {justify-content: flex-start; flex: 1 1 auto; min-width: 0;}
 .st-key-sobe_lista [data-testid="stButton"] button p {font-size: .95rem; font-weight: 500;}
 .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button {background: #5b8f64; border: none; color: #131314;}
 .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button:hover {background: #66a070; color: #131314;}
-.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {margin-left: auto; padding-left: 1rem; font-size: .95rem; white-space: nowrap;}
+.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::before,
+.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {flex: none; margin-left: .5rem; padding: .18rem .6rem; border-radius: 999px; font-size: .7rem; font-weight: 700; letter-spacing: .05em; line-height: 1.2; white-space: nowrap;}
+.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::before {order: 2; padding-left: 1.45rem; border: 1px solid rgba(19,19,20,.45); color: #131314; background: var(--pribor-tamni) .5rem center / .8rem .8rem no-repeat;}
+.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {order: 3;}
 .st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button {background: transparent; border: 1px solid #333537; color: #9aa0a6;}
 .st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button:hover {background: #1e1f20; border-color: #5b8f64; color: #c4c7c5;}
 .kal-okvir {overflow-x: auto; margin: .25rem 0 1rem;}
@@ -931,7 +936,12 @@ table.kal tr.danas td {outline: 2px solid rgba(128,128,128,.55); outline-offset:
 
 
 def ubaci_stil() -> None:
-    st.markdown(CSS, unsafe_allow_html=True)
+    # ikonica viljuške i noža (doručak) – kao CSS varijable, da se koristi i na telefonu i na računaru
+    ikone = (
+        f"<style>:root {{--pribor: {pribor_svg_url('#000')}; "
+        f"--pribor-tamni: {pribor_svg_url('#131314')};}}</style>"
+    )
+    st.markdown(CSS.replace("</style>", "</style>" + ikone, 1), unsafe_allow_html=True)
 
 
 def ubaci_skriptu() -> None:
@@ -1080,6 +1090,21 @@ UPUTSTVO_IKONICA = (
 )
 
 
+PRIBOR_PUTANJA = (
+    "M280-80v-366q-51-14-85.5-56T160-600v-280h80v280h40v-280h80v280h40v-280h80v280q0 56-34.5 98T360-446v366h-80Z"
+    "m400 0v-320H560v-280q0-83 58.5-141.5T760-880v800h-80Z"
+)
+
+
+def pribor_svg_url(boja: str) -> str:
+    """Viljuška i nož kao mala vektorska slika (data URL za CSS)."""
+    svg = (
+        f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960' fill='{boja}'>"
+        f"<path d='{PRIBOR_PUTANJA}'/></svg>"
+    )
+    return 'url("data:image/svg+xml,' + quote(svg, safe="/:=' ") + '")'
+
+
 def ima_dorucak(r: dict) -> bool:
     """Rezervacije preko Bookinga imaju uključen doručak."""
     return str(r.get("izvor") or "") == "Booking"
@@ -1139,22 +1164,20 @@ def kartica_sobe(s: int, r: dict | None, dan: date) -> None:
     """
     if r:
         with st.container(border=True, key=f"kartica_zauzeta_{s}"):
-            znacka = (
-                '<span class="placanje da" title="Plaćeno">✓</span>'
-                if int(r.get("placeno") or 0)
-                else '<span class="placanje ne" title="Čeka plaćanje">€</span>'
+            placanje = (
+                '<span class="pl da">PLAĆENO</span>' if int(r.get("placeno") or 0)
+                else '<span class="pl ne">NIJE PLAĆENO</span>'
             )
-            dorucak = (
-                '<span class="dorucak" title="Doručak uključen (Booking)">🍳</span>'
-                if ima_dorucak(r) else ""
-            )
+            dorucak = '<span class="dor"><i class="ik-pribor"></i>doručak</span>' if ima_dorucak(r) else ""
+            cijena_kratko = "NA UPIT" if broj(r["cijena"]) == 0 else eur(r["cijena"])  # kartica je uska
             # ko je upisao / uredio prikazuje se u prozoru sobe (dodir na karticu)
             st.markdown(
-                f'<div class="kartica">{znacka}{dorucak}'
+                f'<div class="kartica">'
                 f'<div class="glava"><b>Soba {s}</b><span class="status z">ZAUZETA</span></div>'
                 f'<div class="gost">{esc(r["gost"])}</div>'
-                f'<div class="info">do {fmt_dk(r["check_out"])}</div>'
-                f'<div class="cijena">{cijena_tekst(r["cijena"])}</div></div>',
+                f'<div class="red info"><span class="lijevo">do {fmt_dk(r["check_out"])}</span>{dorucak}</div>'
+                f'<div class="red cijena"><span class="lijevo">{cijena_kratko}</span>{placanje}</div>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
             if st.button("Otvori", key=f"otvori_sobu_{s}", icon=":material/edit_note:", width="stretch"):
@@ -1188,19 +1211,20 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
     Oznake plaćanja i doručka idu na desni kraj trake (CSS ::after, bez JavaScripta).
     """
     slobodno = BROJ_SOBA - len(zauzete)
-    oznake = []
+    placeno, nije, dorucak = [], [], []
     with st.container(key="sobe_lista", gap="xxsmall"):
-        st.markdown(
-            f'<div class="gk-glava"><div class="gk-dan"><span class="gk-ned">{DANI_KRATKO[dan.weekday()].upper()}</span>'
-            f'<span class="gk-broj">{dan.day}</span></div>'
-            f'<span class="gk-slobodno">slobodno {slobodno} od {BROJ_SOBA}</span></div>',
-            unsafe_allow_html=True,
+        st.html(
+            f'<div class="gk-glava"><span class="gk-broj">{dan.day}</span>'
+            f'<span class="gk-tekst"><span class="gk-ned">{DANI[dan.weekday()].upper()}</span>'
+            f'<span class="gk-slobodno">slobodno {slobodno} od {BROJ_SOBA}</span></span></div>'
         )
         for s in SOBE:
             r = zauzete.get(s)
             if r:
-                ikone = ("🍳  " if ima_dorucak(r) else "") + ("✅" if int(r.get("placeno") or 0) else "🟡")
-                oznake.append(f'.st-key-otvori_sobu_{s} button::after {{content: "{ikone}";}}')
+                sel = f".st-key-otvori_sobu_{s} button"
+                (placeno if int(r.get("placeno") or 0) else nije).append(sel + "::after")
+                if ima_dorucak(r):
+                    dorucak.append(sel + "::before")
                 if st.button(
                     f"**Soba {s}**  ·  {cijena_tekst(r['cijena'])}", key=f"otvori_sobu_{s}", width="stretch"
                 ):
@@ -1208,8 +1232,15 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
             else:
                 if st.button(f"**Soba {s}**  ·  slobodna", key=f"rezervisi_sobu_{s}", width="stretch"):
                     otvori_dijalog({"tip": "nova", "soba": s, "dan": dan.isoformat()})
-    if oznake:
-        st.html("<style>" + "\n".join(oznake) + "</style>")
+    pravila = []
+    if placeno:
+        pravila.append(", ".join(placeno) + ' {content: "PLAĆENO"; background: #131314; color: #b7dfbe;}')
+    if nije:
+        pravila.append(", ".join(nije) + ' {content: "NIJE PLAĆENO"; background: #fdd663; color: #131314;}')
+    if dorucak:
+        pravila.append(", ".join(dorucak) + ' {content: "DORUČAK";}')
+    if pravila:
+        st.html("<style>" + "\n".join(pravila) + "</style>")
 
 
 @st.fragment(run_every=OSVJEZAVANJE_SEKUNDI)
@@ -1235,8 +1266,8 @@ def stanje_soba_uzivo() -> None:
         for r in dolasci:
             st.markdown(
                 f"**Soba {r['soba']}** · {md(r['gost'])} · do {fmt_dk(r['check_out'])} · {r['izvor']} · "
-                f"{'Plaćeno ✓' if int(r.get('placeno') or 0) else 'Nije plaćeno'}"
-                + (" · 🍳 doručak" if ima_dorucak(r) else "")
+                f"{'plaćeno' if int(r.get('placeno') or 0) else 'nije plaćeno'}"
+                + (" · :material/restaurant: doručak" if ima_dorucak(r) else "")
                 + (f"  \n_{md(r['napomena'])}_" if r["napomena"] else "")
             )
             st.caption(f"upisao {r['upisao']} · {fmt_dtk(r['kreirano'])}")
@@ -1465,7 +1496,7 @@ def dijalog_rezervacije(rid: int) -> None:
         f"**{cijena_tekst(r['cijena'])}** · {r['izvor']}"
     )
     if ima_dorucak(r):
-        st.markdown("🍳 **Doručak uključen** (Booking)")
+        st.markdown(":material/restaurant: **Doručak uključen** (Booking)")
     if r["napomena"]:
         st.markdown(f"Napomena: _{md(r['napomena'])}_")
     st.caption(f"Upisao: {r['upisao']} · {fmt_dt(r['kreirano'])}")
@@ -1908,7 +1939,7 @@ def lista_rezervacija() -> None:
                 st.markdown(
                     f"{fmt_d(r.ci)} → {fmt_d(r.co)} · {noci_tekst((r.co - r.ci).days)} · "
                     f"{r.izvor} · {cijena_tekst(r.cijena)} · "
-                    f"{'Plaćeno ✓' if int(r.placeno or 0) else 'Nije plaćeno'}"
+                    f"{'Plaćeno' if int(r.placeno or 0) else 'Nije plaćeno'}"
                 )
                 if r.napomena:
                     st.markdown(f"Napomena: _{md(r.napomena)}_")
