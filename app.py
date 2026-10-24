@@ -886,20 +886,21 @@ h1 {font-size: 1.75rem !important;}
 [class*="st-key-kartica_"] [data-testid="stButton"] button {min-height: 2.2rem;}
 .kartice-dodir [class*="st-key-kartica_"] [data-testid="stButton"] {display: none !important;}
 .kartice-dodir [class*="st-key-kartica_"] .stElementContainer:has([data-testid="stButton"]) {display: none !important;}
-.kartica {position: relative; height: 5.5rem; overflow: hidden;}
+.kartica {position: relative; height: 5rem; overflow: hidden;}
 .kartica .glava {display: flex; align-items: center; gap: .4rem; font-size: 1rem; line-height: 1.5rem; padding-right: 1.6rem; white-space: nowrap;}
 .kartica .status {display: inline-block; padding: .08rem .4rem; border-radius: 999px; font-size: .58rem; font-weight: 700; letter-spacing: .04em; color: #fff; line-height: 1.2;}
 .kartica .status.s {background: #15803d;}
 .kartica .status.z {background: #dc2626;}
-.kartica .gost, .kartica .info, .kartica .cijena, .kartica .ko {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+.kartica .gost, .kartica .info, .kartica .cijena {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 .kartica .gost {font-size: .88rem; font-weight: 600; line-height: 1.25rem;}
 .kartica .info {font-size: .74rem; line-height: 1.05rem; opacity: .75;}
 .kartica .cijena {font-size: .8rem; font-weight: 700; line-height: 1.15rem;}
-.kartica .ko {font-size: .6rem; line-height: .95rem; opacity: .55;}
 .kartica .prazno {margin-top: .35rem; white-space: normal;}
 .kartica .placanje {position: absolute; top: .05rem; right: 0; width: 1.35rem; height: 1.35rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 800; color: #fff; line-height: 1;}
 .kartica .placanje.da {background: #16a34a;}
 .kartica .placanje.ne {background: #f59e0b;}
+.kartica .dorucak {position: absolute; right: 0; bottom: .05rem; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .95rem; line-height: 1; background: #fff7e6; box-shadow: 0 1px 3px rgba(0,0,0,.25);}
+.kartica .cijena {padding-right: 1.7rem;}
 .kal-okvir {overflow-x: auto; margin: .25rem 0 1rem;}
 table.kal {width: 100%; min-width: 320px; border-collapse: separate !important; border-spacing: 3px; table-layout: fixed; font-size: .8rem; border: none !important; margin: 0;}
 table.kal tr {background: transparent !important;}
@@ -1064,6 +1065,11 @@ UPUTSTVO_IKONICA = (
 )
 
 
+def ima_dorucak(r: dict) -> bool:
+    """Rezervacije preko Bookinga imaju uključen doručak."""
+    return str(r.get("izvor") or "") == "Booking"
+
+
 def je_telefon() -> bool:
     """Telefon → sobe i dugmad po 2 u redu; računar/tablet → po 4."""
     try:
@@ -1123,16 +1129,17 @@ def kartica_sobe(s: int, r: dict | None, dan: date) -> None:
                 if int(r.get("placeno") or 0)
                 else '<span class="placanje ne" title="Čeka plaćanje">€</span>'
             )
-            ko = f"upisao {esc(r['upisao'])} · {fmt_dtk(r['kreirano'])}"
-            if r.get("uredio"):
-                ko += f" · uredio {esc(r['uredio'])} · {fmt_dtk(r['uredjeno'])}"
+            dorucak = (
+                '<span class="dorucak" title="Doručak uključen (Booking)">🍳</span>'
+                if ima_dorucak(r) else ""
+            )
+            # ko je upisao / uredio prikazuje se u prozoru sobe (dodir na karticu)
             st.markdown(
-                f'<div class="kartica">{znacka}'
+                f'<div class="kartica">{znacka}{dorucak}'
                 f'<div class="glava"><b>Soba {s}</b><span class="status z">ZAUZETA</span></div>'
                 f'<div class="gost">{esc(r["gost"])}</div>'
                 f'<div class="info">do {fmt_dk(r["check_out"])}</div>'
-                f'<div class="cijena">{cijena_tekst(r["cijena"])}</div>'
-                f'<div class="ko">{ko}</div></div>',
+                f'<div class="cijena">{cijena_tekst(r["cijena"])}</div></div>',
                 unsafe_allow_html=True,
             )
             if st.button("Otvori", key=f"otvori_sobu_{s}", icon=":material/edit_note:", width="stretch"):
@@ -1180,6 +1187,7 @@ def stanje_soba_uzivo() -> None:
             st.markdown(
                 f"**Soba {r['soba']}** · {md(r['gost'])} · do {fmt_dk(r['check_out'])} · {r['izvor']} · "
                 f"{'Plaćeno ✓' if int(r.get('placeno') or 0) else 'Nije plaćeno'}"
+                + (" · 🍳 doručak" if ima_dorucak(r) else "")
                 + (f"  \n_{md(r['napomena'])}_" if r["napomena"] else "")
             )
             st.caption(f"upisao {r['upisao']} · {fmt_dtk(r['kreirano'])}")
@@ -1407,6 +1415,8 @@ def dijalog_rezervacije(rid: int) -> None:
         f"{fmt_d(ci)} → {fmt_d(co)} · {noci_tekst((co - ci).days)}  \n"
         f"**{cijena_tekst(r['cijena'])}** · {r['izvor']}"
     )
+    if ima_dorucak(r):
+        st.markdown("🍳 **Doručak uključen** (Booking)")
     if r["napomena"]:
         st.markdown(f"Napomena: _{md(r['napomena'])}_")
     st.caption(f"Upisao: {r['upisao']} · {fmt_dt(r['kreirano'])}")
