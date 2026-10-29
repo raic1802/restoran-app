@@ -74,6 +74,9 @@ NOVAC = ["pazar_kafana", "rashod_kafana", "pazar_kuhinja", "rashod_kuhinja", "pa
 # IKONA_URL je javna adresa tog fajla (ako se repozitorijum preimenuje, promijeni i ovo).
 IKONA_URL = "https://raw.githubusercontent.com/raic1802/restoran-app/main/ikona.png"
 IKONA_FAJL = Path(__file__).with_name("ikona.png")
+# Fotografija hotela na vrhu ekrana (fajl hotel.jpg u repozitorijumu; pregledač je čuva u memoriji)
+HOTEL_URL = "https://raw.githubusercontent.com/raic1802/restoran-app/main/hotel.jpg"
+HOTEL_FAJL = Path(__file__).with_name("hotel.jpg")
 
 DANI = ["Ponedjeljak", "Utorak", "Srijeda", "Četvrtak", "Petak", "Subota", "Nedjelja"]
 DANI_KRATKO = ["Pon", "Uto", "Sri", "Čet", "Pet", "Sub", "Ned"]
@@ -466,14 +469,32 @@ def izmijeni_rezervaciju(id_: int, zapis: dict, ko: str, opis: str) -> None:
     zabiljezi_izmjenu(id_, ko, opis, trenutak)
 
 
+SQL_NOVA_REZERVACIJA = """INSERT INTO rezervacije (gost, soba, cijena, izvor, check_in, check_out,
+           napomena, upisao, kreirano, placeno)
+       VALUES (:gost, :soba, :cijena, :izvor, :check_in, :check_out,
+           :napomena, :upisao, :kreirano, :placeno)"""
+
+
 def sacuvaj_rezervaciju(zapis: dict) -> None:
-    zapis = {"placeno": 0, **zapis}
-    izvrsi(
-        """INSERT INTO rezervacije (gost, soba, cijena, izvor, check_in, check_out,
-               napomena, upisao, kreirano, placeno)
-           VALUES (:gost, :soba, :cijena, :izvor, :check_in, :check_out,
-               :napomena, :upisao, :kreirano, :placeno)""",
-        **zapis,
+    izvrsi(SQL_NOVA_REZERVACIJA, **{"placeno": 0, **zapis})
+
+
+def sacuvaj_rezervacije(zapisi: list[dict]) -> int:
+    """Više rezervacija odjednom (uvoz iz fajla) – sve ili ništa, u jednoj transakciji."""
+    if not zapisi:
+        return 0
+    with baza().begin() as conn:
+        for zapis in zapisi:
+            conn.execute(text(SQL_NOVA_REZERVACIJA), {"placeno": 0, **zapis})
+    st.cache_data.clear()
+    return len(zapisi)
+
+
+def aktivne_rezervacije_izmedju(od: date, do: date) -> list[dict]:
+    """Aktivne rezervacije koje se preklapaju sa periodom [od, do) – za provjeru uvoza (bez keša)."""
+    return upit(
+        "SELECT * FROM rezervacije WHERE otkazana = 0 AND check_in < :do AND check_out > :od ORDER BY soba, check_in",
+        od=od.isoformat(), do=do.isoformat(),
     )
 
 
@@ -648,6 +669,101 @@ def raspon_iz_unosa(vrijednost, podrazumijevano: tuple[date, date]) -> tuple[dat
 
 def csv_za_excel(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
+
+
+# ── Uvoz rezervacija iz CSV fajla (npr. iz Google kalendara) ─────────────────
+# Kolone: soba, gost, check_in, check_out, cijena, izvor, placeno, napomena
+# (prve četiri su obavezne; datum kao 2026-10-12 ili 12.10.2026.)
+UVOZ_KOLONE = ["soba", "gost", "check_in", "check_out", "cijena", "izvor", "placeno", "napomena"]
+UVOZ_UPISAO = "Google kalendar"
+UVOZ_DA = {"1", "da", "yes", "true", "x", "placeno", "plaćeno"}
+
+
+def datum_iz_teksta(tekst) -> date:
+    t = ocisti(tekst).rstrip(".")
+    for oblik in ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(t[:10] if oblik == "%Y-%m-%d" else t, oblik).date()
+        except ValueError:
+            pass
+    raise ValueError(f"neispravan datum: {tekst!r}")
+
+
+def cijena_iz_teksta(tekst) -> float:
+    t = re.sub(r"[^\d,.]", "", str(tekst or ""))
+    if "," in t and "." in t:
+        t = t.replace(".", "")
+    return broj(t.replace(",", "."))
+
+
+def procitaj_fajl_uvoza(fajl) -> pd.DataFrame:
+    """CSV (odvojen zarezom ili tačka-zarezom) → tabela sa kolonama UVOZ_KOLONE, sve kao tekst."""
+    sadrzaj = fajl.getvalue() if hasattr(fajl, "getvalue") else fajl.read()
+    tekst = sadrzaj.decode("utf-8-sig") if isinstance(sadrzaj, bytes) else str(sadrzaj)
+    prvi_red = tekst.split("\n", 1)[0]
+    sep = ";" if prvi_red.count(";") > prvi_red.count(",") else ","
+    df = pd.read_csv(io.StringIO(tekst), sep=sep, dtype=str, keep_default_na=False)
+    df.columns = [ocisti(k).casefold().replace("-", "_").replace(" ", "_") for k in df.columns]
+    nema = [k for k in ("soba", "gost", "check_in", "check_out") if k not in df.columns]
+    if nema:
+        raise ValueError("U fajlu nedostaju kolone: " + ", ".join(nema))
+    for k in UVOZ_KOLONE:
+        if k not in df.columns:
+            df[k] = ""
+    return df[UVOZ_KOLONE]
+
+
+def provjeri_uvoz(df: pd.DataFrame, upisao: str, trenutak: datetime) -> list[dict]:
+    """Za svaki red fajla: šta se upisuje ili zašto se preskače (preklapanje, greška)."""
+    stavke: list[dict] = []
+    for red in df.to_dict("records"):
+        s = {
+            "Soba": ocisti(red["soba"]), "Gost": ocisti(red["gost"]), "Dolazak": ocisti(red["check_in"]),
+            "Odlazak": ocisti(red["check_out"]), "Cijena": "", "Izvor": "", "Plaćeno": "", "Status": "",
+            "zapis": None,
+        }
+        stavke.append(s)
+        try:
+            soba = int(float(s["Soba"].replace(",", ".")))
+            ci, co = datum_iz_teksta(red["check_in"]), datum_iz_teksta(red["check_out"])
+        except ValueError:
+            s["Status"] = "✗ neispravna soba ili datum"
+            continue
+        izvor = "Booking" if re.search(r"book|buk", ocisti(red["izvor"]).casefold()) else "Privatno"
+        cijena = cijena_iz_teksta(red["cijena"])
+        placeno = int(ocisti(red["placeno"]).casefold() in UVOZ_DA)
+        s.update(Soba=str(soba), Dolazak=fmt_dk(ci), Odlazak=fmt_dk(co), Cijena=cijena_tekst(cijena),
+                 Izvor=izvor, **{"Plaćeno": "da" if placeno else "ne"})
+        if soba not in SOBE:
+            s["Status"] = f"✗ soba {soba} ne postoji"
+        elif not s["Gost"]:
+            s["Status"] = "✗ nema imena gosta"
+        elif co <= ci:
+            s["Status"] = "✗ odlazak mora biti poslije dolaska"
+        else:
+            s["zapis"] = dict(
+                gost=s["Gost"], soba=soba, cijena=cijena, izvor=izvor, check_in=ci.isoformat(),
+                check_out=co.isoformat(), napomena=ocisti(red["napomena"]), upisao=upisao,
+                kreirano=trenutak.isoformat(sep=" "), placeno=placeno,
+            )
+    # preklapanja: sa već upisanim rezervacijama (jedan upit) i unutar samog fajla
+    ispravne = [s for s in stavke if s["zapis"]]
+    if ispravne:
+        od = min(date.fromisoformat(s["zapis"]["check_in"]) for s in ispravne)
+        do = max(date.fromisoformat(s["zapis"]["check_out"]) for s in ispravne)
+        zauzeto = [(int(r["soba"]), str(r["check_in"]), str(r["check_out"]), str(r["gost"]), False)
+                   for r in aktivne_rezervacije_izmedju(od, do)]
+        for s in ispravne:
+            z = s["zapis"]
+            sudar = next((x for x in zauzeto if x[0] == z["soba"] and x[1] < z["check_out"] and x[2] > z["check_in"]), None)
+            if sudar:
+                s["zapis"] = None
+                s["Status"] = (f"↷ duplo u fajlu ({sudar[3]})" if sudar[4]
+                               else f"↷ već upisano: {sudar[3]} {fmt_dk(sudar[1])}–{fmt_dk(sudar[2])}")
+            else:
+                s["Status"] = "✓ novo"
+                zauzeto.append((z["soba"], z["check_in"], z["check_out"], z["gost"], True))
+    return stavke
 
 
 # ── Prijava i sesija ─────────────────────────────────────────────────────────
@@ -885,7 +1001,8 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 .st-key-sobe_lista, [class*="st-key-kartica_"], .st-key-profil_kartica {background: #fff; border-radius: 20px; padding: 1rem 1rem 1.1rem; box-shadow: 0 2px 14px rgba(20,30,50,.06);}
 
 /* ── vrh početne: slika hotela + profil ── */
-.hero {position: relative; border-radius: 24px; min-height: 13.5rem; padding: 1rem 1.1rem 3.2rem; color: #fff; background-color: #2E4669; background-size: cover; background-position: center; display: flex; flex-direction: column; overflow: hidden;}
+.hero {position: relative; border-radius: 24px; min-height: 13.5rem; padding: 1rem 1.1rem 3.2rem; color: #fff; background-color: #2E4669; background-size: cover; background-position: center 55%; display: flex; flex-direction: column; overflow: hidden;}
+@media (min-width: 641px) {.hero {min-height: 17rem;}}
 .hero-red {display: flex; align-items: center; justify-content: space-between; gap: .6rem;}
 .hero-mjesto {display: inline-flex; align-items: center; gap: .3rem; padding: .38rem .8rem; border-radius: 999px; background: rgba(255,255,255,.18); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: .82rem; font-weight: 600; white-space: nowrap;}
 .hero-zvono {position: relative; width: 2.5rem; height: 2.5rem; border-radius: 50%; background: rgba(255,255,255,.18); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center;}
@@ -950,6 +1067,15 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 .st-key-donja_nav [data-testid="stIconMaterial"] {font-size: 1.5rem !important;}
 .st-key-donja_nav [class*="st-key-nav_aktivan_"] [data-testid="stPageLink-NavLink"] * {color: #3E5C8A !important; font-weight: 700;}
 .st-key-traka_nazad [data-testid="stPageLink-NavLink"] {display: inline-flex; padding: .35rem .8rem; border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(20,30,50,.07);}
+
+/* ── računar: ☰ Meni lijevo gore (uvijek vidljiv, i kad se skroluje) ── */
+.st-key-meni_traka {position: fixed; top: .55rem; left: 1rem; z-index: 999991; width: auto !important;}
+.st-key-meni_traka [data-testid="stPopover"] button {min-height: 2.7rem; padding: 0 1.1rem; border-radius: 999px; background: #fff; border: 1px solid #E6E8EC; box-shadow: 0 4px 14px rgba(20,30,50,.10); color: #1F2430; font-weight: 600;}
+.st-key-meni_traka [data-testid="stPopover"] button:hover, .st-key-meni_traka [data-testid="stPopover"] button:focus {border-color: #3E5C8A; color: #3E5C8A;}
+[data-testid="stPopoverBody"]:has([data-testid="stPageLink-NavLink"]) {min-width: 16rem;}
+[data-testid="stPopoverBody"] [data-testid="stPageLink-NavLink"] {padding: .5rem .7rem; border-radius: 12px;}
+[data-testid="stPopoverBody"] [data-testid="stPageLink-NavLink"]:hover {background: #E9EFF7;}
+[data-testid="stPopoverBody"] [data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"] {color: #3E5C8A;}
 
 /* ── profil ── */
 .profil {display: flex; flex-direction: column; align-items: center; text-align: center; gap: .35rem; padding: .4rem 0 .2rem;}
@@ -1196,6 +1322,11 @@ def slika_url(kljuc: str) -> str:
     return f"data:image/jpeg;base64,{b64}" if b64 else ""
 
 
+def slika_hotela_url() -> str:
+    """Slika izabrana u Podešavanjima, a ako je nema – hotel.jpg iz repozitorijuma."""
+    return slika_url("slika_hotela") or (HOTEL_URL if HOTEL_FAJL.exists() else "")
+
+
 def kljuc_avatara(ime: str) -> str:
     return "avatar:" + ocisti(ime).casefold()
 
@@ -1247,7 +1378,7 @@ def avatar_html(ime: str, kljuc_slike: str, klasa: str = "avatar") -> tuple[str,
 def hero(naslov: str, podnaslov: str, prijavljen: bool) -> None:
     """Vrh ekrana: slika hotela (ili plava pozadina), profil, objekat, pozdrav."""
     naziv = procitaj_podesavanje("naziv_objekta", "Restoran")
-    slika = slika_url("slika_hotela")
+    slika = slika_hotela_url()
     zatamnjenje = "linear-gradient(180deg, rgba(15,23,38,.45) 0%, rgba(15,23,38,.12) 45%, rgba(15,23,38,.72) 100%)"
     stil = [
         f".hero-pozadina {{background-image: {zatamnjenje}, url('{slika}');}}" if slika
@@ -1290,6 +1421,41 @@ def donja_navigacija(aktivna: str) -> None:
         for kljuc, naziv, ikona in stavke:
             with st.container(key=("nav_aktivan_" if kljuc == aktivna else "nav_") + kljuc, width="content"):
                 st.page_link(STRANICE[kljuc], label=naziv, icon=ikona)
+
+
+STAVKE_RAD = [
+    ("pocetna", "Početna", ":material/home:"),
+    ("smjena", "Kraj smjene", ":material/point_of_sale:"),
+    ("smjestaj", "Rezervacije", ":material/hotel:"),
+    ("kalendar", "Kalendar", ":material/calendar_month:"),
+]
+STAVKE_ADMIN = [
+    ("nabavka", "Nabavka", ":material/shopping_cart:"),
+    ("izvjestaji", "Izvještaji", ":material/bar_chart:"),
+    ("artikli", "Artikli", ":material/inventory_2:"),
+    ("narudzbine", "Narudžbe", ":material/receipt_long:"),
+    ("podesavanja", "Podešavanja", ":material/settings:"),
+]
+
+
+def meni_racunar(aktivna: str) -> None:
+    """Računar: dugme ☰ Meni lijevo gore (uvijek vidljivo) – sve stranice i odjava na jednom mjestu."""
+    if st.session_state.get("_meni_stranica") != aktivna:
+        st.session_state["meni"] = False  # poslije prelaska na drugu stranicu meni se zatvori
+    st.session_state["_meni_stranica"] = aktivna
+    with st.container(key="meni_traka", width="content"):
+        with st.popover("Meni", icon=":material/menu:", key="meni", on_change="rerun"):
+            st.caption(f"{prikazno_ime()} · {'admin' if je_admin() else 'zaposleni'}")
+            for kljuc, naziv, ikona in STAVKE_RAD:
+                st.page_link(STRANICE[kljuc], label=naziv, icon=ikona, width="stretch")
+            if je_admin():
+                st.caption("Administracija")
+                for kljuc, naziv, ikona in STAVKE_ADMIN:
+                    st.page_link(STRANICE[kljuc], label=naziv, icon=ikona, width="stretch")
+            st.divider()
+            st.page_link(STRANICE["profil"], label="Profil", icon=":material/person:", width="stretch")
+            if st.button("Odjava", key="meni_odjava", icon=":material/logout:", width="stretch"):
+                _odjavi_se()
 
 
 # ── Početna ──────────────────────────────────────────────────────────────────
@@ -1477,13 +1643,15 @@ def stranica_pocetna() -> None:
     )
     pretraga_gostiju()
     prikazi_poruku()
-    ikonice_mreza()
+    if je_telefon():  # na računaru su sve opcije u ☰ Meni (lijevo gore)
+        ikonice_mreza()
     stanje_soba_uzivo()
 
 
 # ── Profil ───────────────────────────────────────────────────────────────────
 
 def _odjavi_se() -> None:
+    """Poziva se iz tijela stranice (ne iz on_click), jer Streamlit u on_click ignoriše promjenu stranice."""
     _odjava()
     st.switch_page(STRANICE["pocetna"])
 
@@ -1533,7 +1701,8 @@ def stranica_profil() -> None:
 
     with st.expander("Ikonica na telefonu", icon=":material/smartphone:"):
         st.markdown(UPUTSTVO_IKONICA)
-    st.button("Odjava", key="odjava", on_click=_odjavi_se, icon=":material/logout:", width="stretch")
+    if st.button("Odjava", key="odjava", icon=":material/logout:", width="stretch"):
+        _odjavi_se()
 
 
 # ── Prozor (dijalog) za sobu: pregled, uređivanje, otkazivanje ───────────────
@@ -2612,6 +2781,35 @@ def stranica_narudzbine() -> None:
 
 # ── Admin: podešavanja ───────────────────────────────────────────────────────
 
+def uvoz_rezervacija() -> None:
+    """Učitaj CSV → pregled (šta je novo, šta se preskače) → potvrda."""
+    kljuc = f"uvoz_fajl_{st.session_state.get('_uvoz_brojac', 0)}"
+    fajl = st.file_uploader("Fajl sa rezervacijama (CSV)", type=["csv"], key=kljuc)
+    if fajl is None:
+        return
+    try:
+        stavke = provjeri_uvoz(procitaj_fajl_uvoza(fajl), f"{UVOZ_UPISAO} (uvezao {ime_korisnika()})", sada())
+    except (ValueError, UnicodeDecodeError, pd.errors.ParserError) as greska:
+        st.error(f"Fajl ne može da se pročita: {greska}")
+        return
+    nove = [s["zapis"] for s in stavke if s["zapis"]]
+    st.dataframe(
+        pd.DataFrame([{k: v for k, v in s.items() if k != "zapis"} for s in stavke]),
+        hide_index=True, width="stretch",
+    )
+    preskace = len(stavke) - len(nove)
+    st.caption(f"Novih: **{len(nove)}** · preskače se: **{preskace}** (već upisane ili sa greškom)")
+    if not nove:
+        st.info("Nema novih rezervacija za upis.")
+        return
+    if st.button(f"Upiši {len(nove)} rezervacija", key="uvoz_potvrdi", type="primary",
+                 icon=":material/download_done:", width="stretch"):
+        upisano = sacuvaj_rezervacije(nove)
+        st.session_state["_uvoz_brojac"] = int(st.session_state.get("_uvoz_brojac", 0)) + 1  # isprazni izbor fajla
+        poruka_uspjeha(f"Upisano {upisano} rezervacija iz fajla.")
+        st.rerun()
+
+
 def stranica_podesavanja() -> None:
     samo_admin()
     st.title("Podešavanja")
@@ -2632,11 +2830,21 @@ def stranica_podesavanja() -> None:
     st.caption("Prikazuje se na vrhu početne stranice i na prijavi. Najbolje izgleda položena fotografija.")
     if slika_url("slika_hotela"):
         st.image(io.BytesIO(base64.b64decode(procitaj_podesavanje("slika_hotela"))), width="stretch")
-        if st.button("Ukloni sliku hotela", key="hotel_ukloni", icon=":material/delete:", type="tertiary"):
+        vrati = "Vrati osnovnu fotografiju" if HOTEL_FAJL.exists() else "Ukloni sliku hotela"
+        if st.button(vrati, key="hotel_ukloni", icon=":material/delete:", type="tertiary"):
             sacuvaj_podesavanje("slika_hotela", "")
             poruka_uspjeha("Slika hotela je uklonjena.")
             st.rerun()
-    izbor_slike("Izaberi sliku hotela", "slika_hotela", 1400, False, "Slika hotela je sačuvana.")
+    elif HOTEL_FAJL.exists():
+        st.image(str(HOTEL_FAJL), width="stretch", caption="Osnovna fotografija (hotel.jpg)")
+    izbor_slike("Izaberi drugu sliku hotela", "slika_hotela", 1400, False, "Slika hotela je sačuvana.")
+
+    st.markdown("#### Uvoz rezervacija")
+    st.caption(
+        "Učitaj fajl sa rezervacijama (CSV, npr. iz Google kalendara). Prvo vidiš pregled, pa potvrdiš. "
+        "Rezervacije koje se poklapaju sa već upisanim se preskaču, pa isti fajl može bezbjedno da se učita ponovo."
+    )
+    uvoz_rezervacija()
 
     st.markdown("#### Brojevi za slanje nabavke")
     st.caption("Kome admin šalje spisak za nabavku preko WhatsAppa ili SMS-a (npr. Tata, Mama, Ja).")
@@ -2754,13 +2962,18 @@ def main() -> None:
     else:
         meni = {"": rad}
 
-    # Streamlit-ov meni je skriven – navigacija ide preko ikonica na Početnoj i donje trake
+    # Streamlit-ov meni je skriven. Telefon: ikonice na Početnoj + donja traka.
+    # Računar: dugme ☰ Meni lijevo gore sa svim opcijama.
     stranica = st.navigation(meni, position="hidden")
     aktivna = next((k for k, v in STRANICE.items() if v.title == stranica.title), "")
+    telefon = je_telefon()
+    if not telefon:
+        meni_racunar(aktivna)
     if aktivna != "pocetna":
         traka_nazad()
     stranica.run()
-    donja_navigacija(aktivna)
+    if telefon:
+        donja_navigacija(aktivna)
     prikazi_dijalog()
     ubaci_skriptu()
 
