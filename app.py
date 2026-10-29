@@ -1014,27 +1014,22 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 .st-key-pretraga {margin-top: -2.55rem; padding: 0 1rem; position: relative; z-index: 2;}
 .st-key-pretraga [data-baseweb="input"] {border-radius: 14px !important; background: #fff !important; border: none !important; box-shadow: 0 6px 18px rgba(20,30,50,.12); min-height: 3rem;}
 
-/* ── telefon: fiksna traka na dnu (sve stranice), zeleni plus u sredini ── */
-.st-key-donja_traka {position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: #fff; box-shadow: 0 -4px 18px rgba(20,30,50,.08); padding: .25rem .35rem calc(.3rem + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0;}
-.st-key-donja_traka [data-testid="stHorizontalBlock"] {gap: 0 !important; align-items: flex-end; max-width: 27rem; margin: 0 auto;}
+/* ── telefon: traka na dnu (sve stranice): Izvještaji · (+) · Kalendar ── */
+.st-key-donja_traka {position: fixed; left: 1rem; right: 1rem; bottom: calc(.75rem + env(safe-area-inset-bottom)); max-width: 18rem; box-sizing: border-box; margin: 0 auto; z-index: 1000; background: rgba(255,255,255,.97); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid #E6E8EC; border-radius: 24px; box-shadow: 0 12px 30px rgba(20,30,50,.16); padding: .35rem .6rem;}
+.st-key-donja_traka [data-testid="stHorizontalBlock"] {gap: 0 !important; align-items: center;}
 .st-key-donja_traka [data-testid="stColumn"], .st-key-donja_traka [data-testid="stVerticalBlock"], .st-key-donja_traka [data-testid="stElementContainer"] {overflow: visible !important; min-width: 0;}
-.st-key-donja_traka [data-testid="stPageLink-NavLink"] {flex-direction: column; align-items: center; justify-content: center; gap: .05rem; padding: .3rem 0 .1rem; margin: 0; background: transparent !important; text-decoration: none; width: 100%;}
-.st-key-donja_traka [data-testid="stPageLink-NavLink"] * {color: #8A8F98 !important; font-size: .64rem; font-weight: 500; white-space: nowrap; line-height: 1.2;}
-.st-key-donja_traka [data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"] {font-size: 1.35rem !important;}
-.st-key-donja_traka [class*="st-key-dt_aktivan_"] [data-testid="stPageLink-NavLink"] * {color: #3E5C8A !important; font-weight: 700;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] {flex-direction: column; align-items: center; justify-content: center; gap: .1rem; padding: .35rem .2rem; margin: 0 .15rem; border-radius: 16px; background: transparent !important; text-decoration: none; width: auto;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] * {color: #5B6577 !important; font-size: .7rem; font-weight: 600; letter-spacing: .01em; white-space: nowrap; line-height: 1.2;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"] {font-size: 1.5rem !important; color: #3E5C8A !important;}
+.st-key-donja_traka [class*="st-key-dt_aktivan_"] [data-testid="stPageLink-NavLink"] {background: #E9EFF7 !important;}
+.st-key-donja_traka [class*="st-key-dt_aktivan_"] [data-testid="stPageLink-NavLink"] * {color: #3E5C8A !important;}
 .st-key-donja_traka .st-key-dt_nova {display: flex; justify-content: center;}
-.st-key-donja_traka .st-key-dt_nova button {width: 3.3rem; height: 3.3rem; min-height: 0; padding: 0; margin: -1.25rem auto .2rem; border-radius: 50%; background: #2E9D63; border: 4px solid #fff; color: #fff; box-shadow: 0 5px 14px rgba(46,157,99,.4);}
+.st-key-donja_traka .st-key-dt_nova button {width: 3.6rem; height: 3.6rem; min-height: 0; padding: 0; margin: -1.6rem auto 0; border-radius: 50%; background: linear-gradient(145deg, #3DB374 0%, #2E9D63 60%, #26895A 100%); border: 4px solid #fff; color: #fff; box-shadow: 0 8px 18px rgba(46,157,99,.38);}
 .st-key-donja_traka .st-key-dt_nova button:hover, .st-key-donja_traka .st-key-dt_nova button:focus, .st-key-donja_traka .st-key-dt_nova button:active {background: #23804F; color: #fff; border-color: #fff;}
 .st-key-donja_traka .st-key-dt_nova button p {position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;}
-.st-key-donja_traka .st-key-dt_nova [data-testid="stIconMaterial"] {font-size: 1.9rem; color: #fff;}
-[data-testid="stMainBlockContainer"]:has(.st-key-donja_traka), .block-container:has(.st-key-donja_traka) {padding-bottom: 6.5rem;}
+.st-key-donja_traka .st-key-dt_nova [data-testid="stIconMaterial"] {font-size: 2rem; color: #fff;}
+[data-testid="stMainBlockContainer"]:has(.st-key-donja_traka), .block-container:has(.st-key-donja_traka) {padding-bottom: 7.5rem;}
 
-/* ── baner: doručak ── */
-.baner {display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 20px; padding: 1.05rem 1.2rem; color: #fff; background: linear-gradient(135deg, #2E4669 0%, #3E5C8A 55%, #5679AE 100%); box-shadow: 0 6px 18px rgba(46,70,105,.25);}
-.baner-naslov {font-size: 1.15rem; font-weight: 800; letter-spacing: .03em;}
-.baner-tekst {font-size: .85rem; opacity: .9; margin-top: .15rem;}
-.baner-ikona {flex: none; width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center;}
-.baner-ikona svg {width: 1.5rem; height: 1.5rem; fill: #fff;}
 
 /* ── sobe ── */
 .st-key-sobe_lista {gap: .4rem !important; margin-bottom: .3rem;}
@@ -1302,7 +1297,6 @@ IKONA_ZVONO = (
     '<svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4'
     'c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>'
 )
-IKONA_PRIBOR = f'<svg viewBox="0 -960 960 960"><path d="{PRIBOR_PUTANJA}"/></svg>'
 
 
 # ── Slike: hotel i profili (čuvaju se u bazi, smanjene) ─────────────────────
@@ -1449,21 +1443,6 @@ def glavni_meni(aktivna: str) -> None:
 
 # ── Početna ──────────────────────────────────────────────────────────────────
 
-def baner_dorucak(dan: date) -> None:
-    """Koliko soba ima doručak tog jutra (Booking gosti koji su spavali noć prije)."""
-    sobe = sorted(int(r["soba"]) for r in rezervacije_u_periodu(dan - timedelta(days=1), dan - timedelta(days=1))
-                  if ima_dorucak(r))
-    if not sobe:
-        return
-    kada = "DANAS" if dan == danas() else f"{dan.day}.{dan.month}."
-    broj_soba = f"{len(sobe)} soba" if len(sobe) != 1 else "1 soba"
-    st.html(
-        f'<div class="baner"><div><div class="baner-naslov">DORUČAK {kada}</div>'
-        f'<div class="baner-tekst">{broj_soba} · sobe {", ".join(map(str, sobe))}</div></div>'
-        f'<span class="baner-ikona">{IKONA_PRIBOR}</span></div>'
-    )
-
-
 def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
     """Sobe jedna ispod druge (računar i telefon), u bijeloj kartici.
 
@@ -1524,11 +1503,10 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
 
 @st.fragment(run_every=OSVJEZAVANJE_SEKUNDI)
 def stanje_soba_uzivo() -> None:
-    """Doručak, sobe, dolasci i odlasci za izabrani dan – samo se osvježava na svim uređajima."""
+    """Sobe, dolasci i odlasci za izabrani dan – samo se osvježava na svim uređajima."""
     dan = izabrani_dan()
     je_danas = dan == danas()
     zauzete = {int(r["soba"]): r for r in rezervacije_u_periodu(dan, dan)}
-    baner_dorucak(dan)
     lista_soba(zauzete, dan)
 
     c1, c2 = st.columns(2)
@@ -1560,23 +1538,17 @@ def kalendar_uzivo() -> None:
 
 
 def donja_traka(aktivna: str) -> None:
-    """Telefon: traka fiksirana na dnu ekrana (na svim stranicama), uvijek pri ruci.
+    """Telefon: traka koja stoji na dnu ekrana (na svim stranicama), uvijek pri ruci.
 
-    Admin:  Početna · Izvještaji · (+) · Kalendar · Nabavka
-    Radnik: Početna · Rezervacije · (+) · Kalendar · Profil
-    Zeleni plus u sredini otvara novu rezervaciju. Sve ostalo (i Kraj smjene) je u ☰ Meni.
+    Admin:  Izvještaji · (+) · Kalendar      Radnik: Rezervacije · (+) · Kalendar
+    Zeleni plus u sredini otvara novu rezervaciju. Sve ostalo je u ☰ Meni.
     """
-    pocetna = ("pocetna", "Početna", ":material/home:")
-    nova = ("nova", "Nova rezervacija", ":material/add:")
-    kalendar = ("kalendar", "Kalendar", ":material/calendar_month:")
-    if je_admin():
-        stavke = [pocetna, ("izvjestaji", "Izvještaji", ":material/bar_chart:"), nova, kalendar,
-                  ("nabavka", "Nabavka", ":material/shopping_cart:")]
-    else:
-        stavke = [pocetna, ("smjestaj", "Rezervacije", ":material/hotel:"), nova, kalendar,
-                  ("profil", "Profil", ":material/person:")]
+    lijevo = (("izvjestaji", "Izvještaji", ":material/analytics:") if je_admin()
+              else ("smjestaj", "Rezervacije", ":material/hotel:"))
+    stavke = [lijevo, ("nova", "Nova rezervacija", ":material/add:"),
+              ("kalendar", "Kalendar", ":material/calendar_month:")]
     with st.container(key="donja_traka"):
-        kolone = st.columns(len(stavke), wrap=False, gap="small", vertical_alignment="bottom")
+        kolone = st.columns(len(stavke), wrap=False, gap="small", vertical_alignment="center")
         for kolona, (kljuc, naziv, ikona) in zip(kolone, stavke):
             with kolona:
                 if kljuc == "nova":
