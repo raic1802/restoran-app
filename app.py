@@ -1014,17 +1014,20 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 .st-key-pretraga {margin-top: -2.55rem; padding: 0 1rem; position: relative; z-index: 2;}
 .st-key-pretraga [data-baseweb="input"] {border-radius: 14px !important; background: #fff !important; border: none !important; box-shadow: 0 6px 18px rgba(20,30,50,.12); min-height: 3rem;}
 
-/* ── ikonice (prečice) ── */
-.st-key-mreza [data-testid="stButton"] button {background: transparent; border: none; box-shadow: none; min-height: 0; padding: .2rem 0; color: #1F2430;}
-.st-key-mreza [data-testid="stButton"] button:hover, .st-key-mreza [data-testid="stButton"] button:focus {background: transparent; color: #3E5C8A;}
-.st-key-mreza [data-testid="stButton"] button > div, .st-key-mreza [data-testid="stButton"] button > div > div {flex-direction: column; gap: .4rem;}
-.st-key-mreza [data-testid="stButton"] button p {font-size: .74rem; font-weight: 500; line-height: 1.15;}
-.st-key-mreza [data-testid="stHorizontalBlock"] {gap: .3rem;}
-/* zeleni plus u sredini: nova rezervacija (natpis je skriven, ostaje samo za čitače ekrana) */
-.st-key-ik_nova button p {position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;}
-.st-key-mreza .st-key-ik_nova [data-testid="stIconMaterial"] {width: 3.8rem; height: 3.8rem; background: #2E9D63; color: #fff; font-size: 2.2rem; box-shadow: 0 6px 16px rgba(46,157,99,.35);}
-.st-key-mreza .st-key-ik_nova button:hover [data-testid="stIconMaterial"], .st-key-mreza .st-key-ik_nova button:focus [data-testid="stIconMaterial"] {background: #23804F;}
-.st-key-mreza [data-testid="stIconMaterial"] {width: 3.1rem; height: 3.1rem; border-radius: 50%; background: #E9EFF7; color: #3E5C8A; display: inline-flex; align-items: center; justify-content: center; font-size: 1.45rem;}
+/* ── telefon: fiksna traka na dnu (sve stranice), zeleni plus u sredini ── */
+.st-key-donja_traka {position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: #fff; box-shadow: 0 -4px 18px rgba(20,30,50,.08); padding: .25rem .35rem calc(.3rem + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0;}
+.st-key-donja_traka [data-testid="stHorizontalBlock"] {gap: 0 !important; align-items: flex-end; max-width: 27rem; margin: 0 auto;}
+.st-key-donja_traka [data-testid="stColumn"], .st-key-donja_traka [data-testid="stVerticalBlock"], .st-key-donja_traka [data-testid="stElementContainer"] {overflow: visible !important; min-width: 0;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] {flex-direction: column; align-items: center; justify-content: center; gap: .05rem; padding: .3rem 0 .1rem; margin: 0; background: transparent !important; text-decoration: none; width: 100%;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] * {color: #8A8F98 !important; font-size: .64rem; font-weight: 500; white-space: nowrap; line-height: 1.2;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"] {font-size: 1.35rem !important;}
+.st-key-donja_traka [class*="st-key-dt_aktivan_"] [data-testid="stPageLink-NavLink"] * {color: #3E5C8A !important; font-weight: 700;}
+.st-key-donja_traka .st-key-dt_nova {display: flex; justify-content: center;}
+.st-key-donja_traka .st-key-dt_nova button {width: 3.3rem; height: 3.3rem; min-height: 0; padding: 0; margin: -1.25rem auto .2rem; border-radius: 50%; background: #2E9D63; border: 4px solid #fff; color: #fff; box-shadow: 0 5px 14px rgba(46,157,99,.4);}
+.st-key-donja_traka .st-key-dt_nova button:hover, .st-key-donja_traka .st-key-dt_nova button:focus, .st-key-donja_traka .st-key-dt_nova button:active {background: #23804F; color: #fff; border-color: #fff;}
+.st-key-donja_traka .st-key-dt_nova button p {position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;}
+.st-key-donja_traka .st-key-dt_nova [data-testid="stIconMaterial"] {font-size: 1.9rem; color: #fff;}
+[data-testid="stMainBlockContainer"]:has(.st-key-donja_traka), .block-container:has(.st-key-donja_traka) {padding-bottom: 6.5rem;}
 
 /* ── baner: doručak ── */
 .baner {display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 20px; padding: 1.05rem 1.2rem; color: #fff; background: linear-gradient(135deg, #2E4669 0%, #3E5C8A 55%, #5679AE 100%); box-shadow: 0 6px 18px rgba(46,70,105,.25);}
@@ -1044,6 +1047,9 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 [class*="st-key-otvori_sobu_"] button, [class*="st-key-rezervisi_sobu_"] button {min-height: 2.6rem; padding: 0 .9rem; border-radius: 12px; justify-content: flex-start; text-align: left; box-shadow: none;}
 [class*="st-key-otvori_sobu_"] button > div, [class*="st-key-rezervisi_sobu_"] button > div {justify-content: flex-start; flex: 1 1 auto; min-width: 0; overflow: hidden;}
 [class*="st-key-otvori_sobu_"] button p, [class*="st-key-rezervisi_sobu_"] button p {font-size: .95rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+[class*="st-key-otvori_sobu_"] button [data-testid="stMarkdownContainer"] {display: flex; align-items: center; flex: 1 1 auto; min-width: 0; overflow: hidden;}
+[class*="st-key-otvori_sobu_"] button [data-testid="stMarkdownContainer"] p {flex: 0 1 auto; min-width: 0;}
+[class*="st-key-otvori_sobu_"] button [data-testid="stMarkdownContainer"]::after {flex: none; margin-left: .45rem; font-size: .88rem; font-weight: 600; white-space: nowrap;}
 [class*="st-key-otvori_sobu_"] button {background: #3E5C8A; border: none; color: #fff;}
 [class*="st-key-otvori_sobu_"] button:hover, [class*="st-key-otvori_sobu_"] button:focus {background: #2E4669; color: #fff;}
 [class*="st-key-otvori_sobu_"] button::before,
@@ -1264,12 +1270,12 @@ def cijena_kratko(iznos) -> str:
 def natpis_trake(s: int, r: dict, telefon: bool) -> str:
     """Natpis zauzete sobe: broj sobe, ime gosta, cijena (kao u Google Kalendaru).
 
-    Na telefonu ide cijena prije imena: predugo ime se samo skrati sa „…“ (wrap=False)
-    koliko god je ekran uzak, a broj sobe i cijena uvijek ostaju vidljivi.
+    Na telefonu natpis je samo broj sobe i ime; cijenu iza imena dodaje CSS (lista_soba),
+    tako da se predugo ime skrati sa „…“, a cijena uvijek ostane vidljiva.
     """
     ime = md(ocisti(r["gost"]))
     if telefon:
-        return f"**{s}**  {cijena_kratko(r['cijena'])}  ·  {ime}"
+        return f"**{s}**  {ime}"
     return f"**{s}**  {ime}  ·  {cijena_tekst(r['cijena'])}"
 
 
@@ -1279,7 +1285,7 @@ def ima_dorucak(r: dict) -> bool:
 
 
 def je_telefon() -> bool:
-    """Telefon: brze opcije ispod slike i kraći natpisi soba; računar/tablet: samo ☰ Meni."""
+    """Telefon: fiksna traka na dnu i kraći natpisi soba; računar/tablet: samo ☰ Meni."""
     try:
         ua = str(st.context.headers.get("user-agent") or "").lower()
     except Exception:
@@ -1468,7 +1474,7 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
     slobodno = BROJ_SOBA - len(zauzete)
     telefon = je_telefon()
     je_danas = dan == danas()
-    placeno, nije, dorucak = [], [], []
+    placeno, nije, dorucak, cijene = [], [], [], []
     with st.container(key="sobe_lista", gap="xxsmall"):
         with st.container(horizontal=True, vertical_alignment="center", key="sobe_glava", gap="small"):
             st.html(f'<div class="sg-naslov"><b>Sobe</b><span>slobodno {slobodno} od {BROJ_SOBA}</span></div>')
@@ -1489,6 +1495,9 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
                 (placeno if int(r.get("placeno") or 0) else nije).append(sel + "::after")
                 if ima_dorucak(r):
                     dorucak.append(sel + "::before")
+                if telefon:  # cijena odmah iza imena; nikad se ne skraćuje (ime se skrati sa „…“)
+                    cijena = json.dumps("· " + cijena_kratko(r["cijena"]), ensure_ascii=False)
+                    cijene.append(f'{sel} [data-testid="stMarkdownContainer"]::after {{content: {cijena};}}')
                 if st.button(natpis_trake(s, r, telefon), key=f"otvori_sobu_{s}", width="stretch", wrap=False):
                     otvori_dijalog({"tip": "rezervacija", "id": int(r["id"])})
             else:
@@ -1508,6 +1517,7 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
             )
         else:
             pravila.append(", ".join(dorucak) + ' {content: "DORUČAK";}')
+    pravila += cijene
     if pravila:
         st.html("<style>" + "\n".join(pravila) + "</style>")
 
@@ -1549,31 +1559,33 @@ def kalendar_uzivo() -> None:
     kalendar_soba()
 
 
-def brze_opcije() -> None:
-    """Telefon, ispod slike: Izvještaji · Kraj smjene · (+) · Kalendar · Nabavka.
+def donja_traka(aktivna: str) -> None:
+    """Telefon: traka fiksirana na dnu ekrana (na svim stranicama), uvijek pri ruci.
 
-    Zeleni plus u sredini otvara novu rezervaciju. Radnici (bez Izvještaja i Nabavke)
-    vide Kraj smjene · (+) · Kalendar, sa plusom opet u sredini. Sve ostalo je u ☰ Meni.
+    Admin:  Početna · Izvještaji · (+) · Kalendar · Nabavka
+    Radnik: Početna · Rezervacije · (+) · Kalendar · Profil
+    Zeleni plus u sredini otvara novu rezervaciju. Sve ostalo (i Kraj smjene) je u ☰ Meni.
     """
-    admin = je_admin()
-    stavke = [
-        ("Izvještaji", ":material/bar_chart:", "izvjestaji") if admin else None,
-        ("Kraj smjene", ":material/point_of_sale:", "smjena"),
-        ("Nova rezervacija", ":material/add:", "nova"),
-        ("Kalendar", ":material/calendar_month:", "kalendar"),
-        ("Nabavka", ":material/shopping_cart:", "nabavka") if admin else None,
-    ]
-    with st.container(key="mreza"):
-        kolone = st.columns(5, wrap=False, gap="small", vertical_alignment="center")
-        for kolona, stavka in zip(kolone, stavke):
-            if stavka is None:
-                continue
-            naziv, ikona, stranica = stavka
-            if kolona.button(naziv, icon=ikona, width="stretch", key=f"ik_{stranica}"):
-                if stranica == "nova":
-                    otvori_dijalog({"tip": "nova", "dan": izabrani_dan().isoformat()})
+    pocetna = ("pocetna", "Početna", ":material/home:")
+    nova = ("nova", "Nova rezervacija", ":material/add:")
+    kalendar = ("kalendar", "Kalendar", ":material/calendar_month:")
+    if je_admin():
+        stavke = [pocetna, ("izvjestaji", "Izvještaji", ":material/bar_chart:"), nova, kalendar,
+                  ("nabavka", "Nabavka", ":material/shopping_cart:")]
+    else:
+        stavke = [pocetna, ("smjestaj", "Rezervacije", ":material/hotel:"), nova, kalendar,
+                  ("profil", "Profil", ":material/person:")]
+    with st.container(key="donja_traka"):
+        kolone = st.columns(len(stavke), wrap=False, gap="small", vertical_alignment="bottom")
+        for kolona, (kljuc, naziv, ikona) in zip(kolone, stavke):
+            with kolona:
+                if kljuc == "nova":
+                    if st.button(naziv, key="dt_nova", icon=ikona):
+                        dan = izabrani_dan() if aktivna == "pocetna" else danas()
+                        otvori_dijalog({"tip": "nova", "dan": dan.isoformat()})
                 else:
-                    st.switch_page(STRANICE[stranica])
+                    with st.container(key=("dt_aktivan_" if kljuc == aktivna else "dt_") + kljuc):
+                        st.page_link(STRANICE[kljuc], label=naziv, icon=ikona)
 
 
 def pretraga_gostiju() -> None:
@@ -1628,8 +1640,6 @@ def stranica_pocetna() -> None:
     )
     pretraga_gostiju()
     prikazi_poruku()
-    if je_telefon():  # na računaru su sve opcije u ☰ Meni (lijevo gore)
-        brze_opcije()
     stanje_soba_uzivo()
 
 
@@ -2951,13 +2961,15 @@ def main() -> None:
         meni = {"": rad}
 
     # Streamlit-ov meni je skriven. Svuda: dugme ☰ Meni lijevo gore sa svim opcijama.
-    # Telefon na Početnoj još ima i brze opcije ispod slike (zeleni plus u sredini).
+    # Telefon još ima fiksnu traku na dnu (zeleni plus za novu rezervaciju u sredini).
     stranica = st.navigation(meni, position="hidden")
     aktivna = next((k for k, v in STRANICE.items() if v.title == stranica.title), "")
     glavni_meni(aktivna)
     if aktivna != "pocetna":
         traka_nazad()
     stranica.run()
+    if je_telefon():
+        donja_traka(aktivna)
     prikazi_dijalog()
     ubaci_skriptu()
 
