@@ -987,7 +987,7 @@ SIVA = "#8A8F98"
 LINIJA = "#E6E8EC"
 
 CSS = """<style>
-.block-container, [data-testid="stMainBlockContainer"] {max-width: 1000px; padding-top: 3.75rem; padding-bottom: 7rem;}
+.block-container, [data-testid="stMainBlockContainer"] {max-width: 1000px; padding-top: 3.75rem; padding-bottom: 3rem;}
 @media (max-width: 640px) {
   .block-container, [data-testid="stMainBlockContainer"] {padding-left: .8rem; padding-right: .8rem;}
 }
@@ -1019,6 +1019,11 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 .st-key-mreza [data-testid="stButton"] button:hover, .st-key-mreza [data-testid="stButton"] button:focus {background: transparent; color: #3E5C8A;}
 .st-key-mreza [data-testid="stButton"] button > div, .st-key-mreza [data-testid="stButton"] button > div > div {flex-direction: column; gap: .4rem;}
 .st-key-mreza [data-testid="stButton"] button p {font-size: .74rem; font-weight: 500; line-height: 1.15;}
+.st-key-mreza [data-testid="stHorizontalBlock"] {gap: .3rem;}
+/* zeleni plus u sredini: nova rezervacija (natpis je skriven, ostaje samo za čitače ekrana) */
+.st-key-ik_nova button p {position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;}
+.st-key-mreza .st-key-ik_nova [data-testid="stIconMaterial"] {width: 3.8rem; height: 3.8rem; background: #2E9D63; color: #fff; font-size: 2.2rem; box-shadow: 0 6px 16px rgba(46,157,99,.35);}
+.st-key-mreza .st-key-ik_nova button:hover [data-testid="stIconMaterial"], .st-key-mreza .st-key-ik_nova button:focus [data-testid="stIconMaterial"] {background: #23804F;}
 .st-key-mreza [data-testid="stIconMaterial"] {width: 3.1rem; height: 3.1rem; border-radius: 50%; background: #E9EFF7; color: #3E5C8A; display: inline-flex; align-items: center; justify-content: center; font-size: 1.45rem;}
 
 /* ── baner: doručak ── */
@@ -1060,15 +1065,9 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 .kartica-naslov {display: flex; align-items: center; gap: .5rem; font-weight: 700; color: #1F2430; margin-bottom: .2rem;}
 .kartica-naslov i {width: 2rem; height: 2rem; border-radius: 50%; background: #E9EFF7; color: #3E5C8A; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 1rem;}
 
-/* ── donja traka (kao u aplikaciji) ── */
-.st-key-donja_nav {position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: #fff; box-shadow: 0 -4px 18px rgba(20,30,50,.08); padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0;}
-.st-key-donja_nav [data-testid="stPageLink-NavLink"] {flex-direction: column; align-items: center; gap: .1rem; padding: .25rem .4rem; background: transparent !important; text-decoration: none;}
-.st-key-donja_nav [data-testid="stPageLink-NavLink"] * {color: #8A8F98 !important; font-size: .7rem; font-weight: 500;}
-.st-key-donja_nav [data-testid="stIconMaterial"] {font-size: 1.5rem !important;}
-.st-key-donja_nav [class*="st-key-nav_aktivan_"] [data-testid="stPageLink-NavLink"] * {color: #3E5C8A !important; font-weight: 700;}
 .st-key-traka_nazad [data-testid="stPageLink-NavLink"] {display: inline-flex; padding: .35rem .8rem; border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(20,30,50,.07);}
 
-/* ── računar: ☰ Meni lijevo gore (uvijek vidljiv, i kad se skroluje) ── */
+/* ── ☰ Meni lijevo gore (telefon i računar; uvijek vidljiv, i kad se skroluje) ── */
 .st-key-meni_traka {position: fixed; top: .55rem; left: 1rem; z-index: 999991; width: auto !important;}
 .st-key-meni_traka [data-testid="stPopover"] button {min-height: 2.7rem; padding: 0 1.1rem; border-radius: 999px; background: #fff; border: 1px solid #E6E8EC; box-shadow: 0 4px 14px rgba(20,30,50,.10); color: #1F2430; font-weight: 600;}
 .st-key-meni_traka [data-testid="stPopover"] button:hover, .st-key-meni_traka [data-testid="stPopover"] button:focus {border-color: #3E5C8A; color: #3E5C8A;}
@@ -1280,7 +1279,7 @@ def ima_dorucak(r: dict) -> bool:
 
 
 def je_telefon() -> bool:
-    """Telefon → sobe i dugmad po 2 u redu; računar/tablet → po 4."""
+    """Telefon: brze opcije ispod slike i kraći natpisi soba; računar/tablet: samo ☰ Meni."""
     try:
         ua = str(st.context.headers.get("user-agent") or "").lower()
     except Exception:
@@ -1407,22 +1406,6 @@ def traka_nazad() -> None:
         st.page_link(STRANICE["pocetna"], label="Početna", icon=":material/arrow_back:")
 
 
-def donja_navigacija(aktivna: str) -> None:
-    """Donja traka kao u aplikaciji: Početna · Kalendar · Rezervacije · Profil."""
-    stavke = [
-        ("pocetna", "Početna", ":material/home:"),
-        ("kalendar", "Kalendar", ":material/calendar_month:"),
-        ("smjestaj", "Rezervacije", ":material/hotel:"),
-        ("profil", "Profil", ":material/person:"),
-    ]
-    with st.container(
-        horizontal=True, horizontal_alignment="distribute", vertical_alignment="center", key="donja_nav", gap="small"
-    ):
-        for kljuc, naziv, ikona in stavke:
-            with st.container(key=("nav_aktivan_" if kljuc == aktivna else "nav_") + kljuc, width="content"):
-                st.page_link(STRANICE[kljuc], label=naziv, icon=ikona)
-
-
 STAVKE_RAD = [
     ("pocetna", "Početna", ":material/home:"),
     ("smjena", "Kraj smjene", ":material/point_of_sale:"),
@@ -1438,8 +1421,8 @@ STAVKE_ADMIN = [
 ]
 
 
-def meni_racunar(aktivna: str) -> None:
-    """Računar: dugme ☰ Meni lijevo gore (uvijek vidljivo) – sve stranice i odjava na jednom mjestu."""
+def glavni_meni(aktivna: str) -> None:
+    """Dugme ☰ Meni lijevo gore (telefon i računar, uvijek vidljivo) – sve stranice i odjava na jednom mjestu."""
     if st.session_state.get("_meni_stranica") != aktivna:
         st.session_state["meni"] = False  # poslije prelaska na drugu stranicu meni se zatvori
     st.session_state["_meni_stranica"] = aktivna
@@ -1566,28 +1549,30 @@ def kalendar_uzivo() -> None:
     kalendar_soba()
 
 
-def ikonice_mreza() -> None:
-    """Prečice sa ikonicama (kao kategorije u dizajnu): 4 u redu."""
+def brze_opcije() -> None:
+    """Telefon, ispod slike: Izvještaji · Kraj smjene · (+) · Kalendar · Nabavka.
+
+    Zeleni plus u sredini otvara novu rezervaciju. Radnici (bez Izvještaja i Nabavke)
+    vide Kraj smjene · (+) · Kalendar, sa plusom opet u sredini. Sve ostalo je u ☰ Meni.
+    """
+    admin = je_admin()
     stavke = [
-        ("Smjena", ":material/point_of_sale:", "smjena"),
-        ("Rezervacija", ":material/add_circle:", "smjestaj"),
+        ("Izvještaji", ":material/bar_chart:", "izvjestaji") if admin else None,
+        ("Kraj smjene", ":material/point_of_sale:", "smjena"),
+        ("Nova rezervacija", ":material/add:", "nova"),
         ("Kalendar", ":material/calendar_month:", "kalendar"),
+        ("Nabavka", ":material/shopping_cart:", "nabavka") if admin else None,
     ]
-    if je_admin():
-        stavke += [
-            ("Nabavka", ":material/shopping_cart:", "nabavka"),
-            ("Izvještaji", ":material/bar_chart:", "izvjestaji"),
-            ("Artikli", ":material/inventory_2:", "artikli"),
-            ("Narudžbe", ":material/receipt_long:", "narudzbine"),
-            ("Podešavanja", ":material/settings:", "podesavanja"),
-        ]
-    else:
-        stavke.append(("Profil", ":material/person:", "profil"))
-    with st.container(key="mreza", gap="small"):
-        for pocetak in range(0, len(stavke), 4):
-            kolone = st.columns(4, wrap=False, gap="small")
-            for kolona, (naziv, ikona, stranica) in zip(kolone, stavke[pocetak:pocetak + 4]):
-                if kolona.button(naziv, icon=ikona, width="stretch", key=f"ik_{stranica}"):
+    with st.container(key="mreza"):
+        kolone = st.columns(5, wrap=False, gap="small", vertical_alignment="center")
+        for kolona, stavka in zip(kolone, stavke):
+            if stavka is None:
+                continue
+            naziv, ikona, stranica = stavka
+            if kolona.button(naziv, icon=ikona, width="stretch", key=f"ik_{stranica}"):
+                if stranica == "nova":
+                    otvori_dijalog({"tip": "nova", "dan": izabrani_dan().isoformat()})
+                else:
                     st.switch_page(STRANICE[stranica])
 
 
@@ -1644,7 +1629,7 @@ def stranica_pocetna() -> None:
     pretraga_gostiju()
     prikazi_poruku()
     if je_telefon():  # na računaru su sve opcije u ☰ Meni (lijevo gore)
-        ikonice_mreza()
+        brze_opcije()
     stanje_soba_uzivo()
 
 
@@ -1884,8 +1869,10 @@ def dijalog_rezervacije(rid: int) -> None:
 
 
 @st.dialog("Nova rezervacija", width="medium", on_dismiss=_zatvori_dijalog)
-def dijalog_nove_rezervacije(soba: int, dan: date) -> None:
-    st.markdown(f"### Soba {soba}")
+def dijalog_nove_rezervacije(soba: int | None, dan: date) -> None:
+    """Sa trake slobodne sobe – soba je izabrana; sa zelenog plusa – soba se bira u formi."""
+    if soba:
+        st.markdown(f"### Soba {soba}")
     forma_rezervacije(prefiks="rezd_", fiksna_soba=soba, pocetni_dan=dan)
 
 
@@ -1896,7 +1883,8 @@ def prikazi_dijalog() -> None:
     if podaci.get("tip") == "rezervacija":
         dijalog_rezervacije(int(podaci["id"]))
     elif podaci.get("tip") == "nova":
-        dijalog_nove_rezervacije(int(podaci["soba"]), u_datum(podaci.get("dan") or danas()))
+        soba = int(podaci["soba"]) if podaci.get("soba") else None
+        dijalog_nove_rezervacije(soba, u_datum(podaci.get("dan") or danas()))
 
 
 # ── Kraj smjene: pazar i rashodi ─────────────────────────────────────────────
@@ -2962,18 +2950,14 @@ def main() -> None:
     else:
         meni = {"": rad}
 
-    # Streamlit-ov meni je skriven. Telefon: ikonice na Početnoj + donja traka.
-    # Računar: dugme ☰ Meni lijevo gore sa svim opcijama.
+    # Streamlit-ov meni je skriven. Svuda: dugme ☰ Meni lijevo gore sa svim opcijama.
+    # Telefon na Početnoj još ima i brze opcije ispod slike (zeleni plus u sredini).
     stranica = st.navigation(meni, position="hidden")
     aktivna = next((k for k, v in STRANICE.items() if v.title == stranica.title), "")
-    telefon = je_telefon()
-    if not telefon:
-        meni_racunar(aktivna)
+    glavni_meni(aktivna)
     if aktivna != "pocetna":
         traka_nazad()
     stranica.run()
-    if telefon:
-        donja_navigacija(aktivna)
     prikazi_dijalog()
     ubaci_skriptu()
 
