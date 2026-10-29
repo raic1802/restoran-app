@@ -1014,20 +1014,24 @@ h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
 .st-key-pretraga {margin-top: -2.55rem; padding: 0 1rem; position: relative; z-index: 2;}
 .st-key-pretraga [data-baseweb="input"] {border-radius: 14px !important; background: #fff !important; border: none !important; box-shadow: 0 6px 18px rgba(20,30,50,.12); min-height: 3rem;}
 
-/* ── telefon: traka na dnu (sve stranice): Izvještaji · (+) · Kalendar ── */
-.st-key-donja_traka {position: fixed; left: 1rem; right: 1rem; bottom: calc(.75rem + env(safe-area-inset-bottom)); max-width: 18rem; box-sizing: border-box; margin: 0 auto; z-index: 1000; background: rgba(255,255,255,.97); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid #E6E8EC; border-radius: 24px; box-shadow: 0 12px 30px rgba(20,30,50,.16); padding: .35rem .6rem;}
-.st-key-donja_traka [data-testid="stHorizontalBlock"] {gap: 0 !important; align-items: center;}
-.st-key-donja_traka [data-testid="stColumn"], .st-key-donja_traka [data-testid="stVerticalBlock"], .st-key-donja_traka [data-testid="stElementContainer"] {overflow: visible !important; min-width: 0;}
-.st-key-donja_traka [data-testid="stPageLink-NavLink"] {flex-direction: column; align-items: center; justify-content: center; gap: .1rem; padding: .35rem .2rem; margin: 0 .15rem; border-radius: 16px; background: transparent !important; text-decoration: none; width: auto;}
+/* ── telefon: traka na dnu (sve stranice): Izvještaji · (+) · Kalendar ──
+   Sve je UNUTAR trake (plus nije izdignut), pa ništa ne može da se odsiječe. */
+.st-key-donja_traka {position: fixed; left: 1rem; right: 1rem; bottom: calc(.75rem + env(safe-area-inset-bottom)); max-width: 18rem; box-sizing: border-box; margin: 0 auto; z-index: 1000; overflow: visible !important; background: rgba(255,255,255,.97); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid #E6E8EC; border-radius: 28px; box-shadow: 0 12px 30px rgba(20,30,50,.16); padding: .45rem .5rem;}
+.st-key-donja_traka [data-testid="stHorizontalBlock"] {gap: 0 !important; align-items: center !important; flex-wrap: nowrap !important;}
+.st-key-donja_traka [data-testid="stHorizontalBlock"], .st-key-donja_traka [data-testid="stColumn"], .st-key-donja_traka [data-testid="stVerticalBlock"], .st-key-donja_traka [data-testid="stElementContainer"], .st-key-donja_traka [data-testid="stLayoutWrapper"] {overflow: visible !important; min-width: 0;}
+.st-key-donja_traka [data-testid="stColumn"] [data-testid="stVerticalBlock"] {align-items: center; justify-content: center; gap: 0;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] {flex-direction: column; align-items: center; justify-content: center; gap: .1rem; padding: .35rem .7rem; margin: 0 auto; border-radius: 16px; background: transparent !important; text-decoration: none;}
 .st-key-donja_traka [data-testid="stPageLink-NavLink"] * {color: #5B6577 !important; font-size: .7rem; font-weight: 600; letter-spacing: .01em; white-space: nowrap; line-height: 1.2;}
-.st-key-donja_traka [data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"] {font-size: 1.5rem !important; color: #3E5C8A !important;}
+.st-key-donja_traka [data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"] {font-size: 1.5rem !important; color: #3E5C8A !important; margin: 0 !important;}
 .st-key-donja_traka [class*="st-key-dt_aktivan_"] [data-testid="stPageLink-NavLink"] {background: #E9EFF7 !important;}
 .st-key-donja_traka [class*="st-key-dt_aktivan_"] [data-testid="stPageLink-NavLink"] * {color: #3E5C8A !important;}
-.st-key-donja_traka .st-key-dt_nova {display: flex; justify-content: center;}
-.st-key-donja_traka .st-key-dt_nova button {width: 3.6rem; height: 3.6rem; min-height: 0; padding: 0; margin: -1.6rem auto 0; border-radius: 50%; background: linear-gradient(145deg, #3DB374 0%, #2E9D63 60%, #26895A 100%); border: 4px solid #fff; color: #fff; box-shadow: 0 8px 18px rgba(46,157,99,.38);}
-.st-key-donja_traka .st-key-dt_nova button:hover, .st-key-donja_traka .st-key-dt_nova button:focus, .st-key-donja_traka .st-key-dt_nova button:active {background: #23804F; color: #fff; border-color: #fff;}
-.st-key-donja_traka .st-key-dt_nova button p {position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;}
-.st-key-donja_traka .st-key-dt_nova [data-testid="stIconMaterial"] {font-size: 2rem; color: #fff;}
+.st-key-donja_traka .st-key-dt_nova {display: flex !important; justify-content: center; align-items: center; width: 100%;}
+.st-key-donja_traka .st-key-dt_nova [data-testid="stButton"] {display: flex; justify-content: center; width: 100%;}
+.st-key-donja_traka .st-key-dt_nova button {position: relative; display: flex; align-items: center; justify-content: center; flex: none; width: 3.25rem; height: 3.25rem; min-height: 0 !important; padding: 0 !important; margin: 0 auto; border-radius: 50% !important; border: none !important; background: linear-gradient(145deg, #3DB374 0%, #2E9D63 60%, #26895A 100%) !important; color: #fff !important; box-shadow: 0 0 0 4px #E6F5EC, 0 4px 10px rgba(46,157,99,.30);}
+.st-key-donja_traka .st-key-dt_nova button:hover, .st-key-donja_traka .st-key-dt_nova button:focus, .st-key-donja_traka .st-key-dt_nova button:active {background: #23804F !important; color: #fff !important;}
+.st-key-donja_traka .st-key-dt_nova button > div {gap: 0 !important; margin: 0 !important; justify-content: center;}
+.st-key-donja_traka .st-key-dt_nova [data-testid="stMarkdownContainer"] {position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;}
+.st-key-donja_traka .st-key-dt_nova [data-testid="stIconMaterial"] {font-size: 1.9rem !important; color: #fff !important; margin: 0 !important;}
 [data-testid="stMainBlockContainer"]:has(.st-key-donja_traka), .block-container:has(.st-key-donja_traka) {padding-bottom: 7.5rem;}
 
 
