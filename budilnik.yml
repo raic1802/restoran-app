@@ -1,0 +1,64 @@
+# Budilnik za aplikaciju Vidikovac
+# Streamlit besplatno uspava aplikaciju ako je niko ne otvori 12 sati.
+# GitHub ovdje sam otvara aplikaciju svaka 4 sata (kao da ju je neko otvorio u pregledaču),
+# a ako je ipak zaspala, sam pritisne „Yes, get this app back up!".
+# Fajl ide u repozitorijum restoran-app na putanju: .github/workflows/budilnik.yml
+
+name: Budilnik aplikacije
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"   # svaka 4 sata (vrijeme je UTC)
+  workflow_dispatch:          # dugme „Run workflow" za ručnu probu
+
+jobs:
+  probudi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instaliraj pregledač
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Otvori aplikaciju
+        env:
+          ADRESA: https://restoran-app.streamlit.app
+        run: |
+          cat > budilnik.py <<'PY'
+          import os
+          from playwright.sync_api import sync_playwright
+
+          ADRESA = os.environ["ADRESA"]
+          DUGME = "Yes, get this app back up"
+
+
+          def nadji_dugme(page):
+              for okvir in page.frames:
+                  dugme = okvir.get_by_role("button", name=DUGME)
+                  if dugme.count():
+                      return dugme.first
+              return None
+
+
+          with sync_playwright() as p:
+              pregledac = p.chromium.launch()
+              page = pregledac.new_page()
+              page.goto(ADRESA, wait_until="domcontentloaded", timeout=90_000)
+              page.wait_for_timeout(10_000)
+              dugme = nadji_dugme(page)
+              if dugme:
+                  print("Aplikacija je spavala - budim je.")
+                  dugme.click()
+                  page.wait_for_timeout(90_000)
+                  print("Probuđena." if nadji_dugme(page) is None else "Još se pali - probaću opet sljedeći put.")
+              else:
+                  print("Aplikacija je budna.")
+                  page.wait_for_timeout(20_000)
+              pregledac.close()
+          PY
+          python budilnik.py

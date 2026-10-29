@@ -1,0 +1,11 @@
+# Boje aplikacije (svijetla tema, mat plava umjesto roze)
+# Fajl ide u repozitorijum restoran-app na putanju: .streamlit/config.toml
+[theme]
+base = "light"
+primaryColor = "#3E5C8A"
+backgroundColor = "#F3F4F6"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1F2430"
+borderColor = "#E6E8EC"
+baseRadius = "0.75rem"
+font = "sans-serif"

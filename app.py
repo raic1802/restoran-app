@@ -27,9 +27,11 @@ Nova kolona ili tabela = nova stavka na kraju liste MIGRACIJE u dijelu 2.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import html
+import io
 import json
 import os
 import re
@@ -859,72 +861,125 @@ def linkovi_za_poruku(poruka: str, telefon: str) -> dict[str, str]:
 # 4. IZGLED
 # ═════════════════════════════════════════════════════════════════════════════
 
+# Paleta (po uzoru na priloženi dizajn, sa mat plavom umjesto roze)
+PLAVA = "#3E5C8A"          # glavna boja
+PLAVA_TAMNA = "#2E4669"
+PLAVA_SVIJETLA = "#E9EFF7" # pozadina ikonica
+POZADINA = "#F3F4F6"
+TEKST = "#1F2430"
+SIVA = "#8A8F98"
+LINIJA = "#E6E8EC"
+
 CSS = """<style>
-.block-container, [data-testid="stMainBlockContainer"] {max-width: 1080px; padding-top: 4.25rem; padding-bottom: 4rem;}
+.block-container, [data-testid="stMainBlockContainer"] {max-width: 1000px; padding-top: 3.75rem; padding-bottom: 7rem;}
 @media (max-width: 640px) {
-  .block-container, [data-testid="stMainBlockContainer"] {padding-left: .75rem; padding-right: .75rem;}
+  .block-container, [data-testid="stMainBlockContainer"] {padding-left: .8rem; padding-right: .8rem;}
 }
-[data-testid="stButton"] button, [data-testid="stFormSubmitButton"] button, [data-testid="stLinkButton"] a, [data-testid="stDownloadButton"] button {min-height: 3rem; border-radius: 12px; font-weight: 600;}
-[data-testid="stCheckbox"] {padding: .55rem .25rem; border-bottom: 1px solid rgba(128,128,128,.18);}
+[data-testid="stButton"] button, [data-testid="stFormSubmitButton"] button, [data-testid="stLinkButton"] a, [data-testid="stDownloadButton"] button {min-height: 3rem; border-radius: 14px; font-weight: 600;}
+[data-testid="stCheckbox"] {padding: .55rem .25rem; border-bottom: 1px solid #E6E8EC;}
 [data-testid="stCheckbox"] label {width: 100%; font-size: 1.05rem;}
 input, textarea {font-size: 16px !important;}
-h1 {font-size: 1.75rem !important;}
-/* gornji red: ☰ Meni + datum */
-.st-key-zaglavlje {margin-bottom: .35rem;}
-.st-key-zaglavlje [data-testid="stButton"] button {min-height: 2.6rem; min-width: 2.6rem; padding: 0 .6rem;}
-.st-key-glavni_meni button {min-height: 2.6rem; font-weight: 700; border-radius: 12px;}
-.datum-naslov {font-size: 1.15rem; font-weight: 700; line-height: 1.25; text-align: center; margin: 0; white-space: nowrap;}
-.datum-naslov .nije-danas {display: block; font-size: .7rem; font-weight: 600; opacity: .6;}
-.korisnik {margin: 0 0 0 auto; font-size: .85rem; opacity: .65; white-space: nowrap;}
-/* brza dugmad */
-.st-key-brza_dugmad [data-testid="stButton"] button {min-height: 2.75rem; font-size: .9rem; padding: .25rem .5rem;}
-/* računar: sobe kao dnevni pregled Google Kalendara (iste boje) */
-.st-key-sobe_lista {background: #131314; border-radius: 24px; padding: 1rem 1.25rem 1.25rem; gap: 4px !important; margin-bottom: .75rem;}
-.gk-glava {display: flex; align-items: center; gap: .85rem; height: 3rem; padding: 0 0 .7rem .15rem; margin-bottom: .45rem; border-bottom: 1px solid #333537; box-sizing: content-box;}
-.gk-broj {flex: none; width: 2.75rem; height: 2.75rem; border-radius: 50%; background: #aec6f6; color: #132d6b; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; font-weight: 600; line-height: 1;}
-.gk-tekst {display: flex; flex-direction: column; justify-content: center; gap: .15rem; line-height: 1.2;}
-.gk-ned {color: #aec6f6; font-size: .78rem; font-weight: 700; letter-spacing: .08em;}
-.gk-slobodno {color: #c4c7c5; font-size: .85rem;}
-.st-key-sobe_lista [data-testid="stButton"] button {min-height: 2.4rem; padding: 0 .9rem; border-radius: 6px; justify-content: flex-start; text-align: left; box-shadow: none;}
-.st-key-sobe_lista [data-testid="stButton"] button > div {justify-content: flex-start; flex: 1 1 auto; min-width: 0;}
-.st-key-sobe_lista [data-testid="stButton"] button p {font-size: .95rem; font-weight: 500;}
-.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button {background: #5b8f64; border: none; color: #131314;}
-.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button:hover {background: #66a070; color: #131314;}
-.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::before,
-.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {flex: none; margin-left: .5rem; padding: .18rem .6rem; border-radius: 999px; font-size: .7rem; font-weight: 700; letter-spacing: .05em; line-height: 1.2; white-space: nowrap;}
-.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::before {order: 2; padding-left: 1.45rem; border: 1px solid rgba(19,19,20,.45); color: #131314; background: var(--pribor-tamni) .5rem center / .8rem .8rem no-repeat;}
-.st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {order: 3;}
-.st-key-sobe_lista [data-testid="stButton"] button > div {overflow: hidden;}
-.st-key-sobe_lista [data-testid="stButton"] button p {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+h1 {font-size: 1.6rem !important; font-weight: 700 !important;}
+
+/* ── kartice (bijele, zaobljene, blaga sjenka) ── */
+.st-key-sobe_lista, [class*="st-key-kartica_"], .st-key-profil_kartica {background: #fff; border-radius: 20px; padding: 1rem 1rem 1.1rem; box-shadow: 0 2px 14px rgba(20,30,50,.06);}
+
+/* ── vrh početne: slika hotela + profil ── */
+.hero {position: relative; border-radius: 24px; min-height: 13.5rem; padding: 1rem 1.1rem 3.2rem; color: #fff; background-color: #2E4669; background-size: cover; background-position: center; display: flex; flex-direction: column; overflow: hidden;}
+.hero-red {display: flex; align-items: center; justify-content: space-between; gap: .6rem;}
+.hero-mjesto {display: inline-flex; align-items: center; gap: .3rem; padding: .38rem .8rem; border-radius: 999px; background: rgba(255,255,255,.18); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: .82rem; font-weight: 600; white-space: nowrap;}
+.hero-zvono {position: relative; width: 2.5rem; height: 2.5rem; border-radius: 50%; background: rgba(255,255,255,.18); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center;}
+.hero-zvono b {position: absolute; top: -.15rem; right: -.15rem; min-width: 1.15rem; height: 1.15rem; padding: 0 .25rem; border-radius: 999px; background: #fff; color: #3E5C8A; font-size: .68rem; display: flex; align-items: center; justify-content: center; box-sizing: border-box;}
+.hero svg {width: 1.05rem; height: 1.05rem; fill: currentColor; flex: none;}
+.hero-pozdrav {margin-top: auto; padding-top: 1.6rem; font-size: 1.65rem; font-weight: 700; line-height: 1.2;}
+.hero-pod {margin-top: .25rem; font-size: .88rem; opacity: .9;}
+.avatar {flex: none; width: 2.6rem; height: 2.6rem; border-radius: 50%; object-fit: cover; background: #E9EFF7; color: #3E5C8A; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: .95rem; border: 2px solid rgba(255,255,255,.85); box-sizing: border-box;}
+.st-key-pretraga {margin-top: -2.55rem; padding: 0 1rem; position: relative; z-index: 2;}
+.st-key-pretraga [data-baseweb="input"] {border-radius: 14px !important; background: #fff !important; border: none !important; box-shadow: 0 6px 18px rgba(20,30,50,.12); min-height: 3rem;}
+
+/* ── ikonice (prečice) ── */
+.st-key-mreza [data-testid="stButton"] button {background: transparent; border: none; box-shadow: none; min-height: 0; padding: .2rem 0; color: #1F2430;}
+.st-key-mreza [data-testid="stButton"] button:hover, .st-key-mreza [data-testid="stButton"] button:focus {background: transparent; color: #3E5C8A;}
+.st-key-mreza [data-testid="stButton"] button > div, .st-key-mreza [data-testid="stButton"] button > div > div {flex-direction: column; gap: .4rem;}
+.st-key-mreza [data-testid="stButton"] button p {font-size: .74rem; font-weight: 500; line-height: 1.15;}
+.st-key-mreza [data-testid="stIconMaterial"] {width: 3.1rem; height: 3.1rem; border-radius: 50%; background: #E9EFF7; color: #3E5C8A; display: inline-flex; align-items: center; justify-content: center; font-size: 1.45rem;}
+
+/* ── baner: doručak ── */
+.baner {display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-radius: 20px; padding: 1.05rem 1.2rem; color: #fff; background: linear-gradient(135deg, #2E4669 0%, #3E5C8A 55%, #5679AE 100%); box-shadow: 0 6px 18px rgba(46,70,105,.25);}
+.baner-naslov {font-size: 1.15rem; font-weight: 800; letter-spacing: .03em;}
+.baner-tekst {font-size: .85rem; opacity: .9; margin-top: .15rem;}
+.baner-ikona {flex: none; width: 3rem; height: 3rem; border-radius: 50%; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center;}
+.baner-ikona svg {width: 1.5rem; height: 1.5rem; fill: #fff;}
+
+/* ── sobe ── */
+.st-key-sobe_lista {gap: .4rem !important; margin-bottom: .3rem;}
+.sg-naslov {display: flex; flex-direction: column; line-height: 1.2;}
+.sg-naslov b {font-size: 1.1rem; color: #1F2430;}
+.sg-naslov span {font-size: .8rem; color: #8A8F98;}
+.sg-datum {font-size: .85rem; font-weight: 600; color: #1F2430; white-space: nowrap; text-align: center;}
+.sg-datum small {display: block; font-size: .68rem; font-weight: 600; color: #3E5C8A;}
+.st-key-sobe_glava [data-testid="stButton"] button {min-height: 2.1rem; width: 2.1rem; padding: 0; border-radius: 50%; background: #F1F3F6; border: none; color: #3E5C8A;}
+[class*="st-key-otvori_sobu_"] button, [class*="st-key-rezervisi_sobu_"] button {min-height: 2.6rem; padding: 0 .9rem; border-radius: 12px; justify-content: flex-start; text-align: left; box-shadow: none;}
+[class*="st-key-otvori_sobu_"] button > div, [class*="st-key-rezervisi_sobu_"] button > div {justify-content: flex-start; flex: 1 1 auto; min-width: 0; overflow: hidden;}
+[class*="st-key-otvori_sobu_"] button p, [class*="st-key-rezervisi_sobu_"] button p {font-size: .95rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+[class*="st-key-otvori_sobu_"] button {background: #3E5C8A; border: none; color: #fff;}
+[class*="st-key-otvori_sobu_"] button:hover, [class*="st-key-otvori_sobu_"] button:focus {background: #2E4669; color: #fff;}
+[class*="st-key-otvori_sobu_"] button::before,
+[class*="st-key-otvori_sobu_"] button::after {flex: none; margin-left: .5rem; padding: .2rem .6rem; border-radius: 999px; font-size: .68rem; font-weight: 700; letter-spacing: .04em; line-height: 1.2; white-space: nowrap;}
+[class*="st-key-otvori_sobu_"] button::before {order: 2; padding-left: 1.45rem; border: 1px solid rgba(255,255,255,.55); color: #fff; background: var(--pribor-bijeli) .5rem center / .8rem .8rem no-repeat;}
+[class*="st-key-otvori_sobu_"] button::after {order: 3;}
+[class*="st-key-rezervisi_sobu_"] button {background: #F5F6F8; border: 1px dashed #D5DAE1; color: #8A8F98;}
+[class*="st-key-rezervisi_sobu_"] button:hover, [class*="st-key-rezervisi_sobu_"] button:focus {background: #E9EFF7; border-color: #3E5C8A; color: #3E5C8A;}
+[class*="st-key-rezervisi_sobu_"] button::after {content: "+"; order: 3; margin-left: auto; padding-left: .8rem; font-size: 1.2rem; font-weight: 600; color: #3E5C8A;}
 @media (max-width: 640px) {
-  .st-key-sobe_lista {padding: .75rem .7rem .9rem; border-radius: 18px;}
-  .st-key-sobe_lista [data-testid="stButton"] button {min-height: 2.35rem; padding: 0 .65rem;}
-  .st-key-sobe_lista [data-testid="stButton"] button p {font-size: .88rem;}
-  .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::before,
-  .st-key-sobe_lista [class*="st-key-otvori_sobu_"] button::after {margin-left: .35rem; padding: .14rem .45rem; font-size: .6rem;}
-  .gk-glava {height: 2.5rem; padding-bottom: .55rem; margin-bottom: .35rem;}
-  .gk-broj {width: 2.35rem; height: 2.35rem; font-size: 1.1rem;}
+  .st-key-sobe_lista, [class*="st-key-kartica_"] {padding: .85rem .75rem .95rem; border-radius: 18px;}
+  [class*="st-key-otvori_sobu_"] button, [class*="st-key-rezervisi_sobu_"] button {min-height: 2.45rem; padding: 0 .7rem;}
+  [class*="st-key-otvori_sobu_"] button p, [class*="st-key-rezervisi_sobu_"] button p {font-size: .88rem;}
+  [class*="st-key-otvori_sobu_"] button::before,
+  [class*="st-key-otvori_sobu_"] button::after {margin-left: .35rem; padding: .15rem .45rem; font-size: .58rem;}
+  .hero {min-height: 12.5rem;}
+  .hero-pozdrav {font-size: 1.45rem;}
 }
-.st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button {background: transparent; border: 1px solid #333537; color: #9aa0a6;}
-.st-key-sobe_lista [class*="st-key-rezervisi_sobu_"] button:hover {background: #1e1f20; border-color: #5b8f64; color: #c4c7c5;}
-.kal-okvir {overflow-x: auto; margin: .25rem 0 1rem;}
+.kartica-naslov {display: flex; align-items: center; gap: .5rem; font-weight: 700; color: #1F2430; margin-bottom: .2rem;}
+.kartica-naslov i {width: 2rem; height: 2rem; border-radius: 50%; background: #E9EFF7; color: #3E5C8A; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 1rem;}
+
+/* ── donja traka (kao u aplikaciji) ── */
+.st-key-donja_nav {position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; background: #fff; box-shadow: 0 -4px 18px rgba(20,30,50,.08); padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom)); border-radius: 20px 20px 0 0;}
+.st-key-donja_nav [data-testid="stPageLink-NavLink"] {flex-direction: column; align-items: center; gap: .1rem; padding: .25rem .4rem; background: transparent !important; text-decoration: none;}
+.st-key-donja_nav [data-testid="stPageLink-NavLink"] * {color: #8A8F98 !important; font-size: .7rem; font-weight: 500;}
+.st-key-donja_nav [data-testid="stIconMaterial"] {font-size: 1.5rem !important;}
+.st-key-donja_nav [class*="st-key-nav_aktivan_"] [data-testid="stPageLink-NavLink"] * {color: #3E5C8A !important; font-weight: 700;}
+.st-key-traka_nazad [data-testid="stPageLink-NavLink"] {display: inline-flex; padding: .35rem .8rem; border-radius: 999px; background: #fff; box-shadow: 0 2px 10px rgba(20,30,50,.07);}
+
+/* ── profil ── */
+.profil {display: flex; flex-direction: column; align-items: center; text-align: center; gap: .35rem; padding: .4rem 0 .2rem;}
+.profil .avatar {width: 5.5rem; height: 5.5rem; font-size: 1.9rem; border: 3px solid #E9EFF7;}
+.profil-ime {font-size: 1.35rem; font-weight: 700; color: #1F2430;}
+.profil-uloga {display: inline-block; padding: .2rem .7rem; border-radius: 999px; background: #E9EFF7; color: #3E5C8A; font-size: .75rem; font-weight: 700; letter-spacing: .04em;}
+.statistika {display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .6rem; margin-top: .4rem;}
+.statistika div {background: #F5F6F8; border-radius: 14px; padding: .65rem .5rem; text-align: center;}
+.statistika b {display: block; font-size: 1.35rem; color: #3E5C8A;}
+.statistika span {font-size: .72rem; color: #8A8F98;}
+
+/* ── kalendar ── */
+.kal-okvir {overflow-x: auto; margin: .25rem 0 1rem; background: #fff; border-radius: 18px; padding: .6rem; box-shadow: 0 2px 14px rgba(20,30,50,.06);}
 table.kal {width: 100%; min-width: 320px; border-collapse: separate !important; border-spacing: 3px; table-layout: fixed; font-size: .8rem; border: none !important; margin: 0;}
 table.kal tr {background: transparent !important;}
 table.kal th, table.kal td {border: none !important; padding: 0 !important; text-align: center;}
-table.kal th {font-weight: 600; opacity: .7; height: 1.8rem;}
+table.kal th {font-weight: 600; color: #8A8F98; height: 1.8rem;}
 table.kal th.dan {text-align: left; width: 4.4rem; white-space: nowrap; padding-left: .2rem !important;}
-table.kal td {height: 1.9rem; border-radius: 6px; background: rgba(22,163,74,.13); color: #fff; font-weight: 700; font-size: .72rem; overflow: hidden; white-space: nowrap;}
-table.kal td.z {background: #dc2626;}
-table.kal tr.vikend th.dan {opacity: .45;}
-table.kal tr.danas th.dan {opacity: 1; color: #dc2626;}
-table.kal tr.danas td {outline: 2px solid rgba(128,128,128,.55); outline-offset: -1px;}
+table.kal td {height: 1.9rem; border-radius: 6px; background: #EEF1F5; color: #fff; font-weight: 700; font-size: .72rem; overflow: hidden; white-space: nowrap;}
+table.kal td.z {background: #3E5C8A;}
+table.kal tr.vikend th.dan {opacity: .6;}
+table.kal tr.danas th.dan {color: #3E5C8A;}
+table.kal tr.danas td {outline: 2px solid rgba(62,92,138,.45); outline-offset: -1px;}
 </style>"""
 
 
 def ubaci_stil() -> None:
     # ikonica viljuške i noža (doručak) – kao CSS varijable, da se koristi i na telefonu i na računaru
     ikone = (
-        f"<style>:root {{--pribor-tamni: {pribor_svg_url('#131314')};}}</style>"
+        f"<style>:root {{--pribor-bijeli: {pribor_svg_url('#ffffff')};}}</style>"
     )
     st.markdown(CSS.replace("</style>", "</style>" + ikone, 1), unsafe_allow_html=True)
 
@@ -1008,8 +1063,7 @@ def ubaci_skriptu() -> None:
 # ── Prijava ──────────────────────────────────────────────────────────────────
 
 def stranica_prijava() -> None:
-    st.title(procitaj_podesavanje("naziv_objekta", "Restoran"))
-    st.caption(dugi_datum(danas()))
+    hero("Dobro došli 👋", dugi_datum(danas()), prijavljen=False)
 
     tab_radnik, tab_admin = st.tabs(["Zaposleni", "Admin"])
 
@@ -1108,45 +1162,155 @@ def je_telefon() -> bool:
     return any(oznaka in ua for oznaka in ("iphone", "ipod", "android", "mobile"))
 
 
-def kratki_datum(d: date) -> str:
-    return f"{DANI[d.weekday()]}, {d.day}.{d.month}." if je_telefon() else dugi_datum(d)
+# ── Ikonice (vektorske, iste boje kao tekst) ─────────────────────────────────
+IKONA_MJESTO = (
+    '<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z'
+    'm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>'
+)
+IKONA_ZVONO = (
+    '<svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4'
+    'c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>'
+)
+IKONA_PRIBOR = f'<svg viewBox="0 -960 960 960"><path d="{PRIBOR_PUTANJA}"/></svg>'
 
 
-def glavni_meni(grupe: dict[str, list]) -> None:
-    """Dugme ☰ Meni: sve stranice, uputstvo za ikonicu i odjava."""
-    with st.popover("Meni", icon=":material/menu:", key="glavni_meni"):
-        st.caption(f"Prijavljen: **{md(ime_korisnika())}**" + (" (admin)" if je_admin() else ""))
-        for naziv_grupe, stranice in grupe.items():
-            if naziv_grupe:
-                st.caption(naziv_grupe)
-            for stranica in stranice:
-                st.page_link(stranica, width="stretch")
-        st.divider()
-        with st.expander("Ikonica na telefonu", icon=":material/smartphone:"):
-            st.markdown(UPUTSTVO_IKONICA)
-        st.button("Odjava", key="odjava", on_click=_odjava, icon=":material/logout:", width="stretch")
+# ── Slike: hotel i profili (čuvaju se u bazi, smanjene) ─────────────────────
+
+def slika_u_base64(fajl, najvise_px: int, kvadrat: bool = False) -> str:
+    """Smanji sliku (JPG/PNG sa telefona) i vrati je kao tekst za bazu."""
+    from PIL import Image, ImageOps
+
+    slika = ImageOps.exif_transpose(Image.open(fajl)).convert("RGB")
+    if kvadrat:
+        strana = min(slika.size)
+        lijevo, gore = (slika.width - strana) // 2, (slika.height - strana) // 2
+        slika = slika.crop((lijevo, gore, lijevo + strana, gore + strana))
+    slika.thumbnail((najvise_px, najvise_px))
+    bafer = io.BytesIO()
+    slika.save(bafer, "JPEG", quality=80, optimize=True, progressive=True)
+    return base64.b64encode(bafer.getvalue()).decode("ascii")
 
 
-def zaglavlje(grupe: dict[str, list], na_pocetnoj: bool) -> None:
-    """Gornji red na svakoj stranici: ☰ Meni, a na Početnoj i ◀ datum ▶."""
-    with st.container(horizontal=True, wrap=False, vertical_alignment="center", key="zaglavlje"):
-        glavni_meni(grupe)
-        if na_pocetnoj:
-            dan = izabrani_dan()
-            st.button("◀", key="dan_nazad", on_click=_pomjeri_dan, args=(-1,), help="Prethodni dan")
-            oznaka = "" if dan == danas() else '<span class="nije-danas">nije danas</span>'
-            st.markdown(f'<p class="datum-naslov">{esc(kratki_datum(dan))}{oznaka}</p>', unsafe_allow_html=True)
-            st.button("▶", key="dan_naprijed", on_click=_pomjeri_dan, args=(1,), help="Sljedeći dan")
-        else:
-            st.markdown(f'<p class="korisnik">{esc(ime_korisnika())}</p>', unsafe_allow_html=True)
-    if na_pocetnoj and izabrani_dan() != danas():
-        st.button("Vrati na danas", key="dan_danas", on_click=_vrati_na_danas, icon=":material/today:")
+def slika_url(kljuc: str) -> str:
+    b64 = procitaj_podesavanje(kljuc)
+    return f"data:image/jpeg;base64,{b64}" if b64 else ""
 
 
-# ── Početna: status soba ─────────────────────────────────────────────────────
+def kljuc_avatara(ime: str) -> str:
+    return "avatar:" + ocisti(ime).casefold()
+
+
+def prikazno_ime() -> str:
+    """Ime u pozdravu i na profilu (admin može upisati svoje ime u Profilu)."""
+    if je_admin():
+        return procitaj_podesavanje("admin_ime") or "Admin"
+    return ime_korisnika()
+
+
+def _sacuvaj_sliku(kljuc_widgeta: str, kljuc_podesavanja: str, najvise_px: int, kvadrat: bool, poruka: str) -> None:
+    fajl = st.session_state.get(kljuc_widgeta)
+    if fajl is None:
+        return
+    try:
+        sacuvaj_podesavanje(kljuc_podesavanja, slika_u_base64(fajl, najvise_px, kvadrat))
+        poruka_uspjeha(poruka)
+    except Exception:
+        st.session_state["_greska_slike"] = "Ova slika ne može da se otvori. Probaj drugu (JPG ili PNG)."
+    st.session_state["_upload_brojac"] = int(st.session_state.get("_upload_brojac", 0)) + 1  # prazan izbor
+
+
+def izbor_slike(oznaka: str, kljuc_podesavanja: str, najvise_px: int, kvadrat: bool, poruka: str) -> None:
+    kljuc = f"upl_{kljuc_podesavanja}_{st.session_state.get('_upload_brojac', 0)}"
+    st.file_uploader(
+        oznaka, type=["jpg", "jpeg", "png"], key=kljuc, on_change=_sacuvaj_sliku,
+        args=(kljuc, kljuc_podesavanja, najvise_px, kvadrat, poruka),
+    )
+    greska = st.session_state.pop("_greska_slike", None)
+    if greska:
+        st.error(greska)
+
+
+# ── Zajednički dijelovi ekrana ───────────────────────────────────────────────
+
+def avatar_html(ime: str, kljuc_slike: str, klasa: str = "avatar") -> tuple[str, str]:
+    """Krug sa slikom profila ili inicijalima. Vraća (html, css)."""
+    url = slika_url(kljuc_slike) if kljuc_slike else ""
+    if url:
+        oznaka = "av-" + hashlib.md5(kljuc_slike.encode()).hexdigest()[:8]
+        return (
+            f'<span class="{klasa} {oznaka}"></span>',
+            f".{oznaka} {{background: center / cover no-repeat url('{url}');}}",
+        )
+    return f'<span class="{klasa}">{esc(inicijali(ime) or "?")}</span>', ""
+
+
+def hero(naslov: str, podnaslov: str, prijavljen: bool) -> None:
+    """Vrh ekrana: slika hotela (ili plava pozadina), profil, objekat, pozdrav."""
+    naziv = procitaj_podesavanje("naziv_objekta", "Restoran")
+    slika = slika_url("slika_hotela")
+    zatamnjenje = "linear-gradient(180deg, rgba(15,23,38,.45) 0%, rgba(15,23,38,.12) 45%, rgba(15,23,38,.72) 100%)"
+    stil = [
+        f".hero-pozadina {{background-image: {zatamnjenje}, url('{slika}');}}" if slika
+        else ".hero-pozadina {background-image: linear-gradient(135deg, #2E4669 0%, #3E5C8A 60%, #5679AE 100%);}"
+    ]
+    if prijavljen:
+        av_html, av_css = avatar_html(prikazno_ime(), kljuc_avatara(ime_korisnika()))
+        stil.append(av_css)
+        dolasci = len(dolasci_na_dan(danas()))
+        zvono = (
+            f'<span class="hero-zvono" title="Dolasci danas">{IKONA_ZVONO}'
+            + (f"<b>{dolasci}</b>" if dolasci else "") + "</span>"
+        )
+        red = f'<div class="hero-red">{av_html}<span class="hero-mjesto">{IKONA_MJESTO}{esc(naziv)}</span>{zvono}</div>'
+    else:
+        red = f'<div class="hero-red"><span class="hero-mjesto">{IKONA_MJESTO}{esc(naziv)}</span></div>'
+    st.html(
+        "<style>" + "\n".join(x for x in stil if x) + "</style>"
+        f'<div class="hero hero-pozadina">{red}'
+        f'<div class="hero-pozdrav">{esc(naslov)}</div><div class="hero-pod">{esc(podnaslov)}</div></div>'
+    )
+
+
+def traka_nazad() -> None:
+    with st.container(key="traka_nazad"):
+        st.page_link(STRANICE["pocetna"], label="Početna", icon=":material/arrow_back:")
+
+
+def donja_navigacija(aktivna: str) -> None:
+    """Donja traka kao u aplikaciji: Početna · Kalendar · Rezervacije · Profil."""
+    stavke = [
+        ("pocetna", "Početna", ":material/home:"),
+        ("kalendar", "Kalendar", ":material/calendar_month:"),
+        ("smjestaj", "Rezervacije", ":material/hotel:"),
+        ("profil", "Profil", ":material/person:"),
+    ]
+    with st.container(
+        horizontal=True, horizontal_alignment="distribute", vertical_alignment="center", key="donja_nav", gap="small"
+    ):
+        for kljuc, naziv, ikona in stavke:
+            with st.container(key=("nav_aktivan_" if kljuc == aktivna else "nav_") + kljuc, width="content"):
+                st.page_link(STRANICE[kljuc], label=naziv, icon=ikona)
+
+
+# ── Početna ──────────────────────────────────────────────────────────────────
+
+def baner_dorucak(dan: date) -> None:
+    """Koliko soba ima doručak tog jutra (Booking gosti koji su spavali noć prije)."""
+    sobe = sorted(int(r["soba"]) for r in rezervacije_u_periodu(dan - timedelta(days=1), dan - timedelta(days=1))
+                  if ima_dorucak(r))
+    if not sobe:
+        return
+    kada = "DANAS" if dan == danas() else f"{dan.day}.{dan.month}."
+    broj_soba = f"{len(sobe)} soba" if len(sobe) != 1 else "1 soba"
+    st.html(
+        f'<div class="baner"><div><div class="baner-naslov">DORUČAK {kada}</div>'
+        f'<div class="baner-tekst">{broj_soba} · sobe {", ".join(map(str, sobe))}</div></div>'
+        f'<span class="baner-ikona">{IKONA_PRIBOR}</span></div>'
+    )
+
 
 def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
-    """Sobe jedna ispod druge, kao dnevni pregled u Google Kalendaru (računar i telefon).
+    """Sobe jedna ispod druge (računar i telefon), u bijeloj kartici.
 
     Traka prikazuje broj sobe, ime gosta i cijenu; sve ostalo se vidi dodirom (prozor sobe).
     Oznake plaćanja i doručka idu na desni kraj trake (CSS ::before / ::after, bez JavaScripta).
@@ -1154,13 +1318,21 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
     """
     slobodno = BROJ_SOBA - len(zauzete)
     telefon = je_telefon()
+    je_danas = dan == danas()
     placeno, nije, dorucak = [], [], []
     with st.container(key="sobe_lista", gap="xxsmall"):
-        st.html(
-            f'<div class="gk-glava"><span class="gk-broj">{dan.day}</span>'
-            f'<span class="gk-tekst"><span class="gk-ned">{DANI[dan.weekday()].upper()}</span>'
-            f'<span class="gk-slobodno">slobodno {slobodno} od {BROJ_SOBA}</span></span></div>'
-        )
+        with st.container(horizontal=True, vertical_alignment="center", key="sobe_glava", gap="small"):
+            st.html(f'<div class="sg-naslov"><b>Sobe</b><span>slobodno {slobodno} od {BROJ_SOBA}</span></div>')
+            st.button("◀", key="dan_nazad", on_click=_pomjeri_dan, args=(-1,), help="Prethodni dan")
+            st.html(
+                f'<div class="sg-datum">{"<small>DANAS</small>" if je_danas else ""}'
+                f"{DANI_KRATKO[dan.weekday()]} {dan.day}.{dan.month}.</div>",
+                width="content",
+            )
+            st.button("▶", key="dan_naprijed", on_click=_pomjeri_dan, args=(1,), help="Sljedeći dan")
+        if not je_danas:
+            st.button("Vrati na danas", key="dan_danas", on_click=_vrati_na_danas, icon=":material/today:",
+                      type="tertiary")
         for s in SOBE:
             r = zauzete.get(s)
             if r:
@@ -1175,9 +1347,9 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
                     otvori_dijalog({"tip": "nova", "soba": s, "dan": dan.isoformat()})
     pravila = []
     if placeno:
-        pravila.append(", ".join(placeno) + ' {content: "PLAĆENO"; background: #131314; color: #b7dfbe;}')
+        pravila.append(", ".join(placeno) + ' {content: "PLAĆENO"; background: #E3F4E8; color: #1E7B3A;}')
     if nije:
-        pravila.append(", ".join(nije) + ' {content: "NIJE PLAĆENO"; background: #fdd663; color: #131314;}')
+        pravila.append(", ".join(nije) + ' {content: "NIJE PLAĆENO"; background: #FFF0D4; color: #8A5300;}')
     if dorucak:
         if telefon:
             pravila.append(
@@ -1193,15 +1365,16 @@ def lista_soba(zauzete: dict[int, dict], dan: date) -> None:
 
 @st.fragment(run_every=OSVJEZAVANJE_SEKUNDI)
 def stanje_soba_uzivo() -> None:
-    """Sobe, dolasci i odlasci za izabrani dan – samo se osvježava na svim uređajima."""
+    """Doručak, sobe, dolasci i odlasci za izabrani dan – samo se osvježava na svim uređajima."""
     dan = izabrani_dan()
     je_danas = dan == danas()
     zauzete = {int(r["soba"]): r for r in rezervacije_u_periodu(dan, dan)}
+    baner_dorucak(dan)
     lista_soba(zauzete, dan)
 
     c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"**{'Dolasci danas' if je_danas else 'Dolasci'}**")
+    with c1, st.container(key="kartica_dolasci"):
+        st.markdown(f":material/login: **{'Dolasci danas' if je_danas else 'Dolasci'}**")
         dolasci = dolasci_na_dan(dan)
         if not dolasci:
             st.caption("Nema dolazaka.")
@@ -1213,8 +1386,8 @@ def stanje_soba_uzivo() -> None:
                 + (f"  \n_{md(r['napomena'])}_" if r["napomena"] else "")
             )
             st.caption(f"upisao {r['upisao']} · {fmt_dtk(r['kreirano'])}")
-    with c2:
-        st.markdown(f"**{'Odlasci danas' if je_danas else 'Odlasci'}**")
+    with c2, st.container(key="kartica_odlasci"):
+        st.markdown(f":material/logout: **{'Odlasci danas' if je_danas else 'Odlasci'}**")
         odlasci = odlasci_na_dan(dan)
         if not odlasci:
             st.caption("Nema odlazaka.")
@@ -1227,25 +1400,57 @@ def kalendar_uzivo() -> None:
     kalendar_soba()
 
 
-def brza_dugmad() -> None:
-    """Glavna dugmad na vrhu Početne, uredno poređana (2 u redu na telefonu)."""
-    dugmad = [("Kraj smjene", ":material/point_of_sale:", "brzo_smjena", "smjena")]
-    if je_admin():
-        dugmad.append(("Nabavka", ":material/shopping_cart:", "brzo_nabavka", "nabavka"))
-    dugmad += [
-        ("Nova rezervacija", ":material/hotel:", "brzo_rezervacija", "smjestaj"),
-        ("Kalendar", ":material/calendar_month:", "brzo_kalendar", "kalendar"),
+def ikonice_mreza() -> None:
+    """Prečice sa ikonicama (kao kategorije u dizajnu): 4 u redu."""
+    stavke = [
+        ("Smjena", ":material/point_of_sale:", "smjena"),
+        ("Rezervacija", ":material/add_circle:", "smjestaj"),
+        ("Kalendar", ":material/calendar_month:", "kalendar"),
     ]
-    po_redu = (2 if len(dugmad) == 4 else 3) if je_telefon() else len(dugmad)
-    if je_telefon() and po_redu == 3:  # tri dugmeta u jednom redu – kraći nazivi
-        dugmad = [(n.replace("Kraj smjene", "Smjena").replace("Nova rezervacija", "Rezervacija"), i, k, s)
-                  for n, i, k, s in dugmad]
-    with st.container(key="brza_dugmad", gap="small"):
-        for pocetak in range(0, len(dugmad), po_redu):
-            kolone = st.columns(po_redu, wrap=False, gap="small")
-            for kolona, (naziv, ikona, kljuc, stranica) in zip(kolone, dugmad[pocetak:pocetak + po_redu]):
-                if kolona.button(naziv, icon=ikona, width="stretch", key=kljuc):
+    if je_admin():
+        stavke += [
+            ("Nabavka", ":material/shopping_cart:", "nabavka"),
+            ("Izvještaji", ":material/bar_chart:", "izvjestaji"),
+            ("Artikli", ":material/inventory_2:", "artikli"),
+            ("Narudžbe", ":material/receipt_long:", "narudzbine"),
+            ("Podešavanja", ":material/settings:", "podesavanja"),
+        ]
+    else:
+        stavke.append(("Profil", ":material/person:", "profil"))
+    with st.container(key="mreza", gap="small"):
+        for pocetak in range(0, len(stavke), 4):
+            kolone = st.columns(4, wrap=False, gap="small")
+            for kolona, (naziv, ikona, stranica) in zip(kolone, stavke[pocetak:pocetak + 4]):
+                if kolona.button(naziv, icon=ikona, width="stretch", key=f"ik_{stranica}"):
                     st.switch_page(STRANICE[stranica])
+
+
+def pretraga_gostiju() -> None:
+    with st.container(key="pretraga"):
+        trazi = st.text_input(
+            "Pretraga", key="pretraga_gosta", placeholder="Traži gosta ili sobu…",
+            label_visibility="collapsed", icon=":material/search:",
+        )
+    tekst = ocisti(trazi).casefold()
+    if not tekst:
+        return
+    df = sve_rezervacije()
+    rezultati = []
+    if not df.empty:
+        for r in df.itertuples(index=False):
+            if int(r.otkazana):
+                continue
+            if tekst in str(r.gost).casefold() or tekst in (str(r.soba), f"soba {r.soba}"):
+                rezultati.append(r)
+    rezultati.sort(key=lambda r: abs((u_datum(r.check_in) - danas()).days))
+    with st.container(key="kartica_pretraga"):
+        st.markdown(f":material/search: **Rezultati** ({len(rezultati)})")
+        if not rezultati:
+            st.caption("Nema rezervacija za tu pretragu.")
+        for r in rezultati[:8]:
+            natpis = f"**{r.soba}**  {md(r.gost)}  ·  {fmt_dk(r.check_in)} – {fmt_dk(r.check_out)}"
+            if st.button(natpis, key=f"trazi_{int(r.id)}", width="stretch", wrap=False):
+                otvori_dijalog({"tip": "rezervacija", "id": int(r.id)})
 
 
 def izabrani_dan() -> date:
@@ -1263,9 +1468,72 @@ def _vrati_na_danas() -> None:
 
 def stranica_pocetna() -> None:
     zapamti_uredjaj()
-    brza_dugmad()
+    dan = danas()
+    slobodno = BROJ_SOBA - len({int(r["soba"]) for r in rezervacije_u_periodu(dan, dan)})
+    hero(
+        f"Zdravo, {prikazno_ime().split()[0]} 👋",
+        f"{DANI[dan.weekday()]}, {dan.day}. {MJESECI_GEN[dan.month - 1]} · slobodno {slobodno} od {BROJ_SOBA}",
+        prijavljen=True,
+    )
+    pretraga_gostiju()
     prikazi_poruku()
+    ikonice_mreza()
     stanje_soba_uzivo()
+
+
+# ── Profil ───────────────────────────────────────────────────────────────────
+
+def _odjavi_se() -> None:
+    _odjava()
+    st.switch_page(STRANICE["pocetna"])
+
+
+def stranica_profil() -> None:
+    prikazi_poruku()
+    ime = prikazno_ime()
+    av_html, av_css = avatar_html(ime, kljuc_avatara(ime_korisnika()))
+    pocetak_mjeseca = danas().replace(day=1)
+    moje = 0
+    df = sve_rezervacije()
+    if not df.empty:
+        moje = int(((df["upisao"] == ime_korisnika()) & (df["kreirano"].astype(str) >= pocetak_mjeseca.isoformat())).sum())
+    izmjene = int(jedna_vrijednost(
+        "SELECT COUNT(*) FROM izmjene_rezervacija WHERE ko = :ko AND kreirano >= :od",
+        ko=ime_korisnika(), od=pocetak_mjeseca.isoformat(),
+    ) or 0)
+    with st.container(key="profil_kartica"):
+        st.html(
+            (f"<style>{av_css}</style>" if av_css else "")
+            + f'<div class="profil">{av_html}<div class="profil-ime">{esc(ime)}</div>'
+            f'<span class="profil-uloga">{"ADMIN" if je_admin() else "ZAPOSLENI"}</span></div>'
+            f'<div class="statistika"><div><b>{moje}</b><span>rezervacija ovog mjeseca</span></div>'
+            f'<div><b>{izmjene}</b><span>izmjena ovog mjeseca</span></div></div>'
+        )
+
+    with st.expander("Slika profila", icon=":material/photo_camera:"):
+        izbor_slike("Izaberi sliku", kljuc_avatara(ime_korisnika()), 400, True, "Slika profila je sačuvana.")
+        if procitaj_podesavanje(kljuc_avatara(ime_korisnika())):
+            if st.button("Ukloni sliku", key="avatar_ukloni", icon=":material/delete:", type="tertiary"):
+                sacuvaj_podesavanje(kljuc_avatara(ime_korisnika()), "")
+                poruka_uspjeha("Slika profila je uklonjena.")
+                st.rerun()
+
+    if je_admin():
+        with st.expander("Ime za prikaz", icon=":material/badge:"):
+            with st.form("forma_admin_ime", border=False):
+                novo = st.text_input("Ime i prezime", value=procitaj_podesavanje("admin_ime"), key="prof_ime")
+                if st.form_submit_button("Sačuvaj", type="primary", width="stretch"):
+                    sacuvaj_podesavanje("admin_ime", ocisti(novo))
+                    poruka_uspjeha("Ime je sačuvano.")
+                    st.rerun()
+        with st.container(key="kartica_admin"):
+            st.markdown(":material/admin_panel_settings: **Administracija**")
+            for kljuc in ("nabavka", "izvjestaji", "artikli", "narudzbine", "podesavanja"):
+                st.page_link(STRANICE[kljuc], width="stretch")
+
+    with st.expander("Ikonica na telefonu", icon=":material/smartphone:"):
+        st.markdown(UPUTSTVO_IKONICA)
+    st.button("Odjava", key="odjava", on_click=_odjavi_se, icon=":material/logout:", width="stretch")
 
 
 # ── Prozor (dijalog) za sobu: pregled, uređivanje, otkazivanje ───────────────
@@ -2360,6 +2628,16 @@ def stranica_podesavanja() -> None:
         zakazi_reset("pod_")
         st.rerun()
 
+    st.markdown("#### Slika hotela")
+    st.caption("Prikazuje se na vrhu početne stranice i na prijavi. Najbolje izgleda položena fotografija.")
+    if slika_url("slika_hotela"):
+        st.image(io.BytesIO(base64.b64decode(procitaj_podesavanje("slika_hotela"))), width="stretch")
+        if st.button("Ukloni sliku hotela", key="hotel_ukloni", icon=":material/delete:", type="tertiary"):
+            sacuvaj_podesavanje("slika_hotela", "")
+            poruka_uspjeha("Slika hotela je uklonjena.")
+            st.rerun()
+    izbor_slike("Izaberi sliku hotela", "slika_hotela", 1400, False, "Slika hotela je sačuvana.")
+
     st.markdown("#### Brojevi za slanje nabavke")
     st.caption("Kome admin šalje spisak za nabavku preko WhatsAppa ili SMS-a (npr. Tata, Mama, Ja).")
     lista = primaoci()
@@ -2444,6 +2722,7 @@ def main() -> None:
             "kalendar": st.Page(
                 stranica_kalendar, title="Kalendar", icon=":material/calendar_month:", url_path="kalendar"
             ),
+            "profil": st.Page(stranica_profil, title="Profil", icon=":material/person:", url_path="profil"),
         }
     )
     rad = list(STRANICE.values())
@@ -2475,10 +2754,13 @@ def main() -> None:
     else:
         meni = {"": rad}
 
-    # Streamlit-ov meni je skriven – navigacija ide preko dugmeta ☰ Meni u zaglavlju
+    # Streamlit-ov meni je skriven – navigacija ide preko ikonica na Početnoj i donje trake
     stranica = st.navigation(meni, position="hidden")
-    zaglavlje(meni, na_pocetnoj=stranica.title == "Početna")
+    aktivna = next((k for k, v in STRANICE.items() if v.title == stranica.title), "")
+    if aktivna != "pocetna":
+        traka_nazad()
     stranica.run()
+    donja_navigacija(aktivna)
     prikazi_dijalog()
     ubaci_skriptu()
 
